@@ -29,7 +29,11 @@ class AuthController extends Controller
         $role = $request->string('role')->toString();
 
         $farm = $role === 'farmOwner'
-            ? Farm::create(['name' => $request->string('farm_name')->toString()])
+            ? Farm::create($request->safe()->only([
+                'mother_pig_count',
+                'piglet_groups',
+                'pregnant_pig_count',
+            ]) + ['name' => $request->string('farm_name')->toString()])
             : Farm::where('invite_code', $request->string('invite_code')->toString())->firstOrFail();
 
         $user = User::create([

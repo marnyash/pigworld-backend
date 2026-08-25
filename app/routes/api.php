@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CustomerController;
 use App\Http\Controllers\Api\V1\CustomerInteractionController;
 use App\Http\Controllers\Api\V1\FarmMemberController;
+use App\Http\Controllers\Api\V1\FarmSubscriptionController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -24,6 +25,7 @@ Route::prefix('v1')->group(function () {
 
         Route::get('farms/{farm}/members', [FarmMemberController::class, 'index']);
         Route::patch('farms/{farm}/members/{user}', [FarmMemberController::class, 'update']);
+        Route::patch('farms/{farm}/subscription', [FarmSubscriptionController::class, 'update']);
     });
 });
 

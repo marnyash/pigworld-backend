@@ -15,6 +15,10 @@ class FarmResource extends JsonResource
             'name' => $this->name,
             'location' => $this->location,
             'invite_code' => $this->invite_code,
+            'mother_pig_count' => $this->mother_pig_count,
+            'piglet_groups' => $this->piglet_groups ?? [],
+            'pregnant_pig_count' => $this->pregnant_pig_count,
+            'subscription_plan' => $this->subscription_plan,
         ];
     }
 }

@@ -12,7 +12,24 @@ class Farm extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name', 'location', 'invite_code'];
+    protected $fillable = [
+        'name',
+        'location',
+        'invite_code',
+        'mother_pig_count',
+        'piglet_groups',
+        'pregnant_pig_count',
+        'subscription_plan',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'mother_pig_count' => 'integer',
+            'piglet_groups' => 'array',
+            'pregnant_pig_count' => 'integer',
+        ];
+    }
 
     protected static function booted(): void
     {
