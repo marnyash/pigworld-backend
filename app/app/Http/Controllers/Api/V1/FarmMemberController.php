@@ -22,6 +22,11 @@ class FarmMemberController extends Controller
     public function update(UpdateFarmMemberRequest $request, Farm $farm, User $user): JsonResponse
     {
         $this->authorizeOwner($request, $farm);
+        $isFarmMember = $farm->users()->where('users.id', $user->id)->exists();
+
+        if (! $isFarmMember || $user->role === 'farmOwner') {
+            abort(404, 'Farm member not found.');
+        }
 
         $farm->users()->updateExistingPivot($user->id, [
             'permissions' => json_encode($request->validated('permissions')),
