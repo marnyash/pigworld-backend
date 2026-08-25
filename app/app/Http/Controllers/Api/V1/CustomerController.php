@@ -38,6 +38,7 @@ class CustomerController extends Controller
 
     public function store(StoreCustomerRequest $request): JsonResponse
     {
+        $this->authorizeCrmAction($request, 'write');
         $this->authorizeFarm($request, $request->integer('farm_id'));
 
         $customer = Customer::create([
@@ -57,6 +58,7 @@ class CustomerController extends Controller
 
     public function update(UpdateCustomerRequest $request, Customer $customer): JsonResponse
     {
+        $this->authorizeCrmAction($request, 'write');
         $this->authorizeFarm($request, $customer->farm_id);
 
         $customer->update($request->validated());
@@ -66,6 +68,7 @@ class CustomerController extends Controller
 
     public function destroy(Request $request, Customer $customer): JsonResponse
     {
+        $this->authorizeCrmAction($request, 'delete');
         $this->authorizeFarm($request, $customer->farm_id);
 
         $customer->delete();
@@ -80,5 +83,12 @@ class CustomerController extends Controller
         if (! $belongsToFarm) {
             throw ValidationException::withMessages(['farm_id' => ['You do not have access to this farm.']]);
         }
+    }
+
+    private function authorizeCrmAction(Request $request, string $action): void
+    {
+        $role = $request->user()->crm_role ?? ($request->user()->role === 'farmOwner' ? 'admin' : null);
+        if ($action === 'delete' && $role !== 'admin') abort(403, 'Only CRM admins can delete customers.');
+        if ($action === 'write' && !in_array($role, ['admin', 'finance'], true)) abort(403, 'This CRM role is read-only for customer records.');
     }
 }

@@ -5,6 +5,8 @@ use App\Http\Controllers\Api\V1\CustomerController;
 use App\Http\Controllers\Api\V1\CustomerInteractionController;
 use App\Http\Controllers\Api\V1\FarmMemberController;
 use App\Http\Controllers\Api\V1\FarmSubscriptionController;
+use App\Http\Controllers\Api\V1\CrmMemberController;
+use App\Http\Controllers\Api\V1\CrmNotificationController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -22,6 +24,12 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('crm/customers', CustomerController::class);
         Route::get('crm/customers/{customer}/interactions', [CustomerInteractionController::class, 'index']);
         Route::post('crm/customers/{customer}/interactions', [CustomerInteractionController::class, 'store']);
+        Route::get('crm/members', [CrmMemberController::class, 'index']);
+        Route::post('crm/members', [CrmMemberController::class, 'store']);
+        Route::patch('crm/members/{user}', [CrmMemberController::class, 'update']);
+        Route::delete('crm/members/{user}', [CrmMemberController::class, 'destroy']);
+        Route::get('crm/notifications', [CrmNotificationController::class, 'index']);
+        Route::post('crm/notifications', [CrmNotificationController::class, 'store']);
 
         Route::get('farms/{farm}/members', [FarmMemberController::class, 'index']);
         Route::patch('farms/{farm}/members/{user}', [FarmMemberController::class, 'update']);

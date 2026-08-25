@@ -21,6 +21,8 @@ class CustomerInteractionController extends Controller
 
     public function store(StoreCustomerInteractionRequest $request, Customer $customer): JsonResponse
     {
+        $role = $request->user()->crm_role ?? ($request->user()->role === 'farmOwner' ? 'admin' : null);
+        if (!in_array($role, ['admin', 'customer_support'], true)) abort(403, 'Only customer support can reply to customers.');
         $this->authorizeFarm($request, $customer->farm_id);
 
         $interaction = $customer->interactions()->create([
