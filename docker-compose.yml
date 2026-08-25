@@ -16,9 +16,9 @@ services:
       retries: 10
 
   backend:
-    build: ./backend
+    build: ./app
     restart: unless-stopped
-    env_file: ./backend/.env
+    env_file: ./app/.env
     environment:
       DB_HOST: mysql
     depends_on:
@@ -26,6 +26,10 @@ services:
         condition: service_healthy
     volumes:
       - backend_storage:/var/www/html/storage
+
+  crm:
+    build: ../crm
+    restart: unless-stopped
 
   nginx:
     image: nginx:1.27-alpine
@@ -36,9 +40,10 @@ services:
     volumes:
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - ./nginx/certs:/etc/nginx/certs:ro
-      - ./backend/public:/var/www/html/public:ro
+      - ./app/public:/var/www/html/public:ro
     depends_on:
       - backend
+      - crm
 
 volumes:
   mysql_data:
