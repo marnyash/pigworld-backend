@@ -24,7 +24,7 @@ class FarmMemberController extends Controller
         $this->authorizeOwner($request, $farm);
 
         $farm->users()->updateExistingPivot($user->id, [
-            'permissions' => $request->validated('permissions'),
+            'permissions' => json_encode($request->validated('permissions')),
         ]);
 
         return response()->json(['data' => new FarmMemberResource($farm->users()->findOrFail($user->id))]);
