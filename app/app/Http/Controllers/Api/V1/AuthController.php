@@ -9,6 +9,7 @@ use App\Http\Requests\Auth\RefreshTokenRequest;
 use App\Http\Requests\Auth\RegisterRequest;
 use App\Http\Resources\FarmResource;
 use App\Http\Resources\UserResource;
+use App\Models\Farm;
 use App\Models\User;
 use App\Services\Auth\TokenIssuer;
 use Illuminate\Http\JsonResponse;
@@ -25,12 +26,20 @@ class AuthController extends Controller
 
     public function register(RegisterRequest $request): JsonResponse
     {
+        $role = $request->string('role')->toString();
+
+        $farm = $role === 'farmOwner'
+            ? Farm::create(['name' => $request->string('farm_name')->toString()])
+            : Farm::where('invite_code', $request->string('invite_code')->toString())->firstOrFail();
+
         $user = User::create([
             'name' => $request->string('name'),
             'email' => $request->string('email'),
             'password' => Hash::make($request->string('password')),
-            'role' => 'farmOwner',
+            'role' => $role,
         ]);
+
+        $user->farms()->attach($farm->id);
 
         return $this->authResponse($user);
     }

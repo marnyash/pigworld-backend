@@ -6,17 +6,34 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 
 class Farm extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name', 'location'];
+    protected $fillable = ['name', 'location', 'invite_code'];
+
+    protected static function booted(): void
+    {
+        static::creating(function (Farm $farm) {
+            $farm->invite_code ??= self::generateInviteCode();
+        });
+    }
+
+    public static function generateInviteCode(): string
+    {
+        do {
+            $code = Str::upper(Str::random(8));
+        } while (self::where('invite_code', $code)->exists());
+
+        return $code;
+    }
 
     /** @return BelongsToMany<User, Farm> */
     public function users(): BelongsToMany
     {
-        return $this->belongsToMany(User::class);
+        return $this->belongsToMany(User::class)->withPivot('permissions')->withTimestamps();
     }
 
     /** @return HasMany<Customer, Farm> */

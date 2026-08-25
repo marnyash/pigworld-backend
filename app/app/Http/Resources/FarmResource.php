@@ -14,6 +14,7 @@ class FarmResource extends JsonResource
             'id' => (string) $this->id,
             'name' => $this->name,
             'location' => $this->location,
+            'invite_code' => $this->invite_code,
         ];
     }
 }

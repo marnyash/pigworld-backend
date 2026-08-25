@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CustomerController;
 use App\Http\Controllers\Api\V1\CustomerInteractionController;
+use App\Http\Controllers\Api\V1\FarmMemberController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -20,5 +21,9 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('crm/customers', CustomerController::class);
         Route::get('crm/customers/{customer}/interactions', [CustomerInteractionController::class, 'index']);
         Route::post('crm/customers/{customer}/interactions', [CustomerInteractionController::class, 'store']);
+
+        Route::get('farms/{farm}/members', [FarmMemberController::class, 'index']);
+        Route::patch('farms/{farm}/members/{user}', [FarmMemberController::class, 'update']);
     });
 });
+
