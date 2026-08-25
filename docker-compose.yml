@@ -26,24 +26,41 @@ services:
         condition: service_healthy
     volumes:
       - backend_storage:/var/www/html/storage
+    command: >-
+      sh -c "php artisan migrate --force &&
+      php artisan config:cache &&
+      php artisan route:cache &&
+      php artisan view:cache &&
+      exec php-fpm -F"
+    healthcheck:
+      test: ["CMD-SHELL", "php-fpm -t"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   crm:
     build: ../crm
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://localhost/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   nginx:
     image: nginx:1.27-alpine
     restart: unless-stopped
     ports:
       - "80:80"
-      - "443:443"
     volumes:
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - ./nginx/certs:/etc/nginx/certs:ro
       - ./app/public:/var/www/html/public:ro
     depends_on:
-      - backend
-      - crm
+      backend:
+        condition: service_healthy
+      crm:
+        condition: service_healthy
 
 volumes:
   mysql_data:
