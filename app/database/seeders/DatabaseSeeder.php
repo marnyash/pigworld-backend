@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\User;
+use App\Models\Farm;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -15,11 +16,18 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
-
-        User::factory()->create([
+        $user = User::updateOrCreate(['email' => 'test@example.com'], [
             'name' => 'Test User',
-            'email' => 'test@example.com',
+            'password' => 'password',
+            'role' => 'farmOwner',
         ]);
+
+        $farm = Farm::firstOrCreate([
+            'name' => 'Green Valley Farm',
+        ], [
+            'location' => 'Kenya',
+        ]);
+
+        $user->farms()->syncWithoutDetaching([$farm->id]);
     }
 }
