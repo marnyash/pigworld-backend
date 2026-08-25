@@ -14,6 +14,7 @@ class CustomerInteractionController extends Controller
 {
     public function index(Request $request, Customer $customer): JsonResponse
     {
+        $this->authorizeCrmAccess($request);
         $this->authorizeFarm($request, $customer->farm_id);
 
         return response()->json(['data' => CustomerInteractionResource::collection($customer->interactions)]);
@@ -40,6 +41,14 @@ class CustomerInteractionController extends Controller
 
         if (! $belongsToFarm) {
             throw ValidationException::withMessages(['farm_id' => ['You do not have access to this farm.']]);
+        }
+    }
+
+    private function authorizeCrmAccess(Request $request): void
+    {
+        $role = $request->user()->crm_role ?? ($request->user()->role === 'farmOwner' ? 'admin' : null);
+        if (! in_array($role, ['admin', 'finance', 'customer_support'], true)) {
+            abort(403, 'Only CRM staff can access customer interactions.');
         }
     }
 }

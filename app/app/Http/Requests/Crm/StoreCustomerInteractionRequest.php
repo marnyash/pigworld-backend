@@ -15,7 +15,7 @@ class StoreCustomerInteractionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'type' => ['required', Rule::in(['call', 'email', 'visit', 'meeting', 'note'])],
+            'type' => ['required', Rule::in(['call', 'email', 'visit', 'meeting', 'note', 'message'])],
             'notes' => ['nullable', 'string'],
             'occurred_at' => ['nullable', 'date'],
         ];

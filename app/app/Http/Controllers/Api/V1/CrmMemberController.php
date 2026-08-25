@@ -15,8 +15,9 @@ class CrmMemberController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $this->admin($request);
+        $this->canViewDirectory($request);
         $farmId = $request->integer('farm_id');
+        $this->adminFarm($request, $farmId);
         $members = User::whereHas('farms', fn ($query) => $query->where('farms.id', $farmId))
             ->whereNotNull('crm_role')->latest()->get();
 
@@ -26,6 +27,7 @@ class CrmMemberController extends Controller
     public function store(StoreCrmMemberRequest $request): JsonResponse
     {
         $this->admin($request);
+        $this->adminFarm($request, $request->integer('farm_id'));
         $member = User::create([
             'name' => $request->string('name'),
             'email' => $request->string('email'),
@@ -41,6 +43,7 @@ class CrmMemberController extends Controller
     public function update(UpdateCrmMemberRequest $request, User $user): JsonResponse
     {
         $this->admin($request);
+        $this->sameFarm($request, $user);
         if ($user->crm_role === 'admin') abort(422, 'The admin account cannot be closed or reassigned.');
         $data = $request->validated();
         if (array_key_exists('crm_role', $data)) $user->crm_role = $data['crm_role'];
@@ -53,6 +56,7 @@ class CrmMemberController extends Controller
     public function destroy(Request $request, User $user): JsonResponse
     {
         $this->admin($request);
+        $this->sameFarm($request, $user);
         if ($user->crm_role === 'admin') abort(422, 'The admin account cannot be deleted.');
         $user->delete();
         return response()->json(null, 204);
@@ -62,6 +66,29 @@ class CrmMemberController extends Controller
     {
         if ($request->user()->crm_role !== 'admin' && $request->user()->role !== 'farmOwner') {
             abort(403, 'Only CRM admins can manage CRM accounts.');
+        }
+    }
+
+    private function canViewDirectory(Request $request): void
+    {
+        $role = $request->user()->crm_role ?? ($request->user()->role === 'farmOwner' ? 'admin' : null);
+        if (! in_array($role, ['admin', 'customer_support'], true)) {
+            abort(403, 'Only CRM staff can view CRM accounts.');
+        }
+    }
+
+    private function adminFarm(Request $request, int $farmId): void
+    {
+        if (! $request->user()->farms()->where('farms.id', $farmId)->exists()) {
+            abort(403, 'You do not have access to this farm.');
+        }
+    }
+
+    private function sameFarm(Request $request, User $target): void
+    {
+        $adminFarmIds = $request->user()->farms()->pluck('farms.id');
+        if (! $target->farms()->whereIn('farms.id', $adminFarmIds)->exists()) {
+            abort(404, 'CRM account not found.');
         }
     }
 }

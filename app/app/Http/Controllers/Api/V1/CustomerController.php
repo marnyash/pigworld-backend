@@ -15,6 +15,7 @@ class CustomerController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
+        $this->authorizeCrmAccess($request);
         $farmIds = $request->user()->farms()->pluck('farms.id');
 
         $customers = Customer::query()
@@ -51,6 +52,7 @@ class CustomerController extends Controller
 
     public function show(Request $request, Customer $customer): JsonResponse
     {
+        $this->authorizeCrmAccess($request);
         $this->authorizeFarm($request, $customer->farm_id);
 
         return response()->json(['data' => new CustomerResource($customer)]);
@@ -58,6 +60,7 @@ class CustomerController extends Controller
 
     public function update(UpdateCustomerRequest $request, Customer $customer): JsonResponse
     {
+        $this->authorizeCrmAccess($request);
         $this->authorizeCrmAction($request, 'write');
         $this->authorizeFarm($request, $customer->farm_id);
 
@@ -68,6 +71,7 @@ class CustomerController extends Controller
 
     public function destroy(Request $request, Customer $customer): JsonResponse
     {
+        $this->authorizeCrmAccess($request);
         $this->authorizeCrmAction($request, 'delete');
         $this->authorizeFarm($request, $customer->farm_id);
 
@@ -90,5 +94,13 @@ class CustomerController extends Controller
         $role = $request->user()->crm_role ?? ($request->user()->role === 'farmOwner' ? 'admin' : null);
         if ($action === 'delete' && $role !== 'admin') abort(403, 'Only CRM admins can delete customers.');
         if ($action === 'write' && !in_array($role, ['admin', 'finance'], true)) abort(403, 'This CRM role is read-only for customer records.');
+    }
+
+    private function authorizeCrmAccess(Request $request): void
+    {
+        $role = $request->user()->crm_role ?? ($request->user()->role === 'farmOwner' ? 'admin' : null);
+        if (! in_array($role, ['admin', 'finance', 'customer_support'], true)) {
+            abort(403, 'Only CRM staff can access customer records.');
+        }
     }
 }

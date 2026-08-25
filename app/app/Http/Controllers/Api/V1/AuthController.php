@@ -52,7 +52,7 @@ class AuthController extends Controller
     {
         $user = User::where('email', $request->string('email'))->first();
 
-        if ($user === null || ! Hash::check($request->string('password'), $user->password)) {
+        if ($user === null || $user->crm_closed_at !== null || ! Hash::check($request->string('password'), $user->password)) {
             // Same message whether the email exists or not, so we don't leak account existence.
             throw ValidationException::withMessages(['email' => ['These credentials do not match our records.']]);
         }
