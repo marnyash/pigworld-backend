@@ -86,6 +86,10 @@ class CrmMemberController extends Controller
 
     private function sameFarm(Request $request, User $target): void
     {
+        if ($target->crm_role === null) {
+            abort(404, 'CRM account not found.');
+        }
+
         $adminFarmIds = $request->user()->farms()->pluck('farms.id');
         if (! $target->farms()->whereIn('farms.id', $adminFarmIds)->exists()) {
             abort(404, 'CRM account not found.');

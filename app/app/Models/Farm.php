@@ -58,4 +58,20 @@ class Farm extends Model
     {
         return $this->hasMany(Customer::class);
     }
+
+    /** @return HasMany<Animal, Farm> */
+    public function animals(): HasMany
+    {
+        return $this->hasMany(Animal::class);
+    }
+
+    public function feedStocks(): HasMany
+    {
+        return $this->hasMany(FeedStock::class);
+    }
+
+    public function feedUsages(): HasMany
+    {
+        return $this->hasMany(FeedUsage::class);
+    }
 }

@@ -17,6 +17,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Validation\ValidationException;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class AuthController extends Controller
 {
@@ -39,6 +40,7 @@ class AuthController extends Controller
         $user = User::create([
             'name' => $request->string('name'),
             'email' => $request->string('email'),
+            'phone' => $request->string('phone'),
             'password' => Hash::make($request->string('password')),
             'role' => $role,
         ]);
@@ -50,11 +52,14 @@ class AuthController extends Controller
 
     public function login(LoginRequest $request): JsonResponse
     {
-        $user = User::where('email', $request->string('email'))->first();
+        $identifier = $request->string('identifier')->toString();
+        $user = User::where('email', $identifier)
+            ->orWhere('phone', $identifier)
+            ->first();
 
         if ($user === null || $user->crm_closed_at !== null || ! Hash::check($request->string('password'), $user->password)) {
-            // Same message whether the email exists or not, so we don't leak account existence.
-            throw ValidationException::withMessages(['email' => ['These credentials do not match our records.']]);
+            // Same message whether the identifier exists or not, so we don't leak account existence.
+            throw ValidationException::withMessages(['identifier' => ['These credentials do not match our records.']]);
         }
 
         return $this->authResponse($user);
@@ -75,7 +80,9 @@ class AuthController extends Controller
 
     public function logout(Request $request): JsonResponse
     {
-        $request->user()?->currentAccessToken()?->delete();
+        if ($token = $request->bearerToken()) {
+            PersonalAccessToken::findToken($token)?->delete();
+        }
 
         return response()->json(null, 204);
     }

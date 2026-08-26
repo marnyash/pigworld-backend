@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\User;
 use App\Models\Farm;
+use App\Models\SubscriptionPlan;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -29,5 +30,13 @@ class DatabaseSeeder extends Seeder
         ]);
 
         $user->farms()->syncWithoutDetaching([$farm->id]);
+
+        foreach ([
+            ['code' => 'starter', 'name' => 'Starter', 'description' => 'For small farms getting started.', 'amount' => 10, 'currency' => 'USD', 'pig_limit' => 50],
+            ['code' => 'growth', 'name' => 'Growth', 'description' => 'For growing teams and herds.', 'amount' => 25, 'currency' => 'USD', 'pig_limit' => 250],
+            ['code' => 'enterprise', 'name' => 'Enterprise', 'description' => 'For large or multi-farm operations.', 'amount' => 60, 'currency' => 'USD', 'pig_limit' => null],
+        ] as $plan) {
+            SubscriptionPlan::updateOrCreate(['code' => $plan['code']], $plan + ['active' => true]);
+        }
     }
 }

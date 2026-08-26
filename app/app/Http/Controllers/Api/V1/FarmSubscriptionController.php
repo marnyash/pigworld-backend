@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Farm\UpdateSubscriptionRequest;
 use App\Http\Resources\FarmResource;
 use App\Models\Farm;
+use App\Models\SubscriptionPlan;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -21,7 +22,13 @@ class FarmSubscriptionController extends Controller
             abort(403, 'Only the farm owner can choose a subscription.');
         }
 
-        $farm->update(['subscription_plan' => $request->string('plan')->toString()]);
+        $plan = SubscriptionPlan::where('code', $request->string('plan')->toString())
+            ->where('active', true)->first();
+        if ($plan === null) {
+            abort(422, 'This subscription plan is not available.');
+        }
+
+        $farm->update(['subscription_plan' => $plan->code]);
 
         return response()->json(['farm' => new FarmResource($farm->fresh())]);
     }

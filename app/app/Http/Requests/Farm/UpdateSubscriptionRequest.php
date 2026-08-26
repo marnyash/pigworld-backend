@@ -14,7 +14,7 @@ class UpdateSubscriptionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'plan' => ['required', 'string', 'in:starter,growth,enterprise'],
+            'plan' => ['required', 'string', 'exists:subscription_plans,code'],
         ];
     }
 }
