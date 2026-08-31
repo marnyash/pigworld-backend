@@ -84,6 +84,8 @@ class AuthController extends Controller
             PersonalAccessToken::findToken($token)?->delete();
         }
 
+        $request->user()->refreshTokens()->update(['revoked_at' => now()]);
+
         return response()->json(null, 204);
     }
 

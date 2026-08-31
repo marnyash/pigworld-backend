@@ -17,24 +17,29 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        $user = User::updateOrCreate(['email' => 'test@example.com'], [
-            'name' => 'Test User',
-            'password' => 'password',
-            'role' => 'farmOwner',
-        ]);
+        $tester = User::where('email', 'test@example.com')->first();
+        if (config('app.env') === 'production') {
+            $tester?->delete();
+        } else {
+            $user = User::updateOrCreate(['email' => 'test@example.com'], [
+                'name' => 'Test User',
+                'password' => 'password',
+                'role' => 'farmOwner',
+            ]);
 
-        $farm = Farm::firstOrCreate([
-            'name' => 'Green Valley Farm',
-        ], [
-            'location' => 'Kenya',
-        ]);
+            $farm = Farm::firstOrCreate([
+                'name' => 'Green Valley Farm',
+            ], [
+                'location' => 'Kenya',
+            ]);
 
-        $user->farms()->syncWithoutDetaching([$farm->id]);
+            $user->farms()->syncWithoutDetaching([$farm->id]);
+        }
 
         foreach ([
-            ['code' => 'starter', 'name' => 'Starter', 'description' => 'For small farms getting started.', 'amount' => 10, 'currency' => 'USD', 'pig_limit' => 50],
-            ['code' => 'growth', 'name' => 'Growth', 'description' => 'For growing teams and herds.', 'amount' => 25, 'currency' => 'USD', 'pig_limit' => 250],
-            ['code' => 'enterprise', 'name' => 'Enterprise', 'description' => 'For large or multi-farm operations.', 'amount' => 60, 'currency' => 'USD', 'pig_limit' => null],
+            ['code' => 'starter', 'name' => 'Starter', 'description' => 'For small farms getting started.', 'amount' => 10, 'currency' => 'KES', 'pig_limit' => 50],
+            ['code' => 'growth', 'name' => 'Growth', 'description' => 'For growing teams and herds.', 'amount' => 25, 'currency' => 'KES', 'pig_limit' => 250],
+            ['code' => 'enterprise', 'name' => 'Enterprise', 'description' => 'For large or multi-farm operations.', 'amount' => 60, 'currency' => 'KES', 'pig_limit' => null],
         ] as $plan) {
             SubscriptionPlan::updateOrCreate(['code' => $plan['code']], $plan + ['active' => true]);
         }

@@ -74,4 +74,10 @@ class Farm extends Model
     {
         return $this->hasMany(FeedUsage::class);
     }
+
+    /** @return HasMany<Payment, Farm> */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class);
+    }
 }

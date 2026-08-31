@@ -19,7 +19,7 @@ class CrmMemberController extends Controller
         $farmId = $request->integer('farm_id');
         $this->adminFarm($request, $farmId);
         $members = User::whereHas('farms', fn ($query) => $query->where('farms.id', $farmId))
-            ->whereNotNull('crm_role')->latest()->get();
+            ->latest()->get();
 
         return response()->json(['data' => UserResource::collection($members)]);
     }

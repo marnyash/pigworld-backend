@@ -6,7 +6,13 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class StoreSubscriptionPlanRequest extends FormRequest
 {
-    public function authorize(): bool { return true; }
+    public function authorize(): bool
+    {
+        $user = $this->user();
+
+        return $user !== null
+            && ($user->role === 'farmOwner' || in_array($user->crm_role, ['admin', 'finance'], true));
+    }
 
     public function rules(): array
     {

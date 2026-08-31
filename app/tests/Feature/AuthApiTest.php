@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Farm;
+use App\Models\RefreshToken;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -74,6 +75,7 @@ class AuthApiTest extends TestCase
             'password' => 'password',
         ])->assertOk();
         $token = $login->json('access_token');
+        $refreshToken = $login->json('refresh_token');
 
         $this->withToken($token)->getJson('/api/v1/auth/me')
             ->assertOk()
@@ -82,5 +84,29 @@ class AuthApiTest extends TestCase
         $this->withToken($token)->postJson('/api/v1/auth/logout')->assertNoContent();
         $this->app['auth']->forgetGuards();
         $this->withToken($token)->getJson('/api/v1/auth/me')->assertUnauthorized();
+        $this->postJson('/api/v1/auth/refresh', [
+            'refresh_token' => $refreshToken,
+        ])->assertUnprocessable()->assertJsonValidationErrors('refresh_token');
+        $this->assertSame(0, RefreshToken::where('user_id', $user->id)->whereNull('revoked_at')->count());
+    }
+
+    public function test_seeded_tester_can_login_outside_production(): void
+    {
+        $this->seed();
+
+        $this->postJson('/api/v1/auth/login', [
+            'identifier' => 'test@example.com',
+            'password' => 'password',
+        ])->assertOk()->assertJsonPath('user.email', 'test@example.com');
+    }
+
+    public function test_production_seed_removes_the_predictable_tester_account(): void
+    {
+        User::factory()->create(['email' => 'test@example.com']);
+        config(['app.env' => 'production']);
+
+        $this->seed();
+
+        $this->assertDatabaseMissing('users', ['email' => 'test@example.com']);
     }
 }

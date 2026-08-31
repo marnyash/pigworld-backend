@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\V1\CrmReportController;
 use App\Http\Controllers\Api\V1\SubscriptionPlanController;
 use App\Http\Controllers\Api\V1\FeedController;
 use App\Http\Controllers\Api\V1\FarmOverviewController;
+use App\Http\Controllers\Api\V1\MpesaPaymentController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -48,11 +49,14 @@ Route::prefix('v1')->group(function () {
         Route::get('farms/{farm}/members', [FarmMemberController::class, 'index']);
         Route::patch('farms/{farm}/members/{user}', [FarmMemberController::class, 'update']);
         Route::patch('farms/{farm}/subscription', [FarmSubscriptionController::class, 'update']);
+        Route::post('farms/{farm}/subscription/payment', [MpesaPaymentController::class, 'store']);
         Route::get('farms/{farm}/animals', [HerdController::class, 'index']);
         Route::post('farms/{farm}/animals', [HerdController::class, 'store']);
         Route::get('farms/{farm}/animals/{animal}', [HerdController::class, 'show']);
         Route::patch('farms/{farm}/animals/{animal}', [HerdController::class, 'update']);
         Route::delete('farms/{farm}/animals/{animal}', [HerdController::class, 'destroy']);
     });
+
+    Route::post('payments/mpesa/callback', [MpesaPaymentController::class, 'callback']);
 });
 

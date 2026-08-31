@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
+use App\Models\Farm;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -27,6 +28,26 @@ class CrmReportController extends Controller
             ->selectRaw('status, count(*) as total')
             ->groupBy('status')
             ->pluck('total', 'status');
+        $farms = Farm::query()
+            ->whereIn('id', $farmIds)
+            ->when($farmId !== null, fn ($query) => $query->whereKey($farmId))
+            ->with(['users' => fn ($query) => $query->where('role', 'farmOwner')])
+            ->get()
+            ->map(function (Farm $farm): array {
+                $payment = $farm->payments()->latest()->first();
+
+                return [
+                    'id' => (string) $farm->id,
+                    'name' => $farm->name,
+                    'mother_pig_count' => $farm->mother_pig_count,
+                    'subscription_plan' => $farm->subscription_plan,
+                    'payment_status' => $payment?->status,
+                    'payment_amount' => $payment?->amount,
+                    'payment_currency' => $payment?->currency,
+                    'mpesa_receipt' => $payment?->mpesa_receipt,
+                    'paid_at' => $payment?->paid_at?->toIso8601String(),
+                ];
+            });
 
         return response()->json([
             'data' => [
@@ -36,6 +57,7 @@ class CrmReportController extends Controller
                 'won' => (int) ($statusCounts['won'] ?? 0),
                 'conversion_rate' => $total > 0 ? round(((int) ($statusCounts['won'] ?? 0) / $total) * 100, 2) : 0,
                 'by_status' => $statusCounts,
+                'subscriptions' => $farms,
                 'generated_at' => now()->toIso8601String(),
             ],
         ]);
