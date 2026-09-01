@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\V1\CustomerController;
 use App\Http\Controllers\Api\V1\CustomerInteractionController;
 use App\Http\Controllers\Api\V1\FarmMemberController;
 use App\Http\Controllers\Api\V1\FarmSubscriptionController;
+use App\Http\Controllers\Api\V1\HealthController;
 use App\Http\Controllers\Api\V1\HerdController;
 use App\Http\Controllers\Api\V1\CrmMemberController;
 use App\Http\Controllers\Api\V1\CrmNotificationController;
@@ -59,6 +60,14 @@ Route::prefix('v1')->group(function () {
         Route::get('farms/{farm}/animals/{animal}', [HerdController::class, 'show']);
         Route::patch('farms/{farm}/animals/{animal}', [HerdController::class, 'update']);
         Route::delete('farms/{farm}/animals/{animal}', [HerdController::class, 'destroy']);
+
+        Route::get('farms/{farm}/health-records', [HealthController::class, 'index']);
+        Route::post('farms/{farm}/health-records', [HealthController::class, 'store']);
+        Route::get('farms/{farm}/health-records/{healthRecord}', [HealthController::class, 'show']);
+        Route::patch('farms/{farm}/health-records/{healthRecord}', [HealthController::class, 'update']);
+        Route::delete('farms/{farm}/health-records/{healthRecord}', [HealthController::class, 'destroy']);
+        Route::get('farms/{farm}/health-alerts', [HealthController::class, 'getAlerts']);
+        Route::get('farms/{farm}/health-analytics', [HealthController::class, 'getAnalytics']);
     });
 
     Route::post('payments/mpesa/callback', [MpesaPaymentController::class, 'callback']);

@@ -80,4 +80,10 @@ class Farm extends Model
     {
         return $this->hasMany(Payment::class);
     }
+
+    /** @return HasMany<HealthRecord, Farm> */
+    public function healthRecords(): HasMany
+    {
+        return $this->hasMany(HealthRecord::class);
+    }
 }
