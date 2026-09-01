@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\V1\CrmReportController;
 use App\Http\Controllers\Api\V1\SubscriptionPlanController;
 use App\Http\Controllers\Api\V1\FeedController;
 use App\Http\Controllers\Api\V1\FarmOverviewController;
+use App\Http\Controllers\Api\V1\FarmNotificationController;
 use App\Http\Controllers\Api\V1\MpesaPaymentController;
 use Illuminate\Support\Facades\Route;
 
@@ -31,6 +32,8 @@ Route::prefix('v1')->group(function () {
         Route::get('farms/{farm}/feed', [FeedController::class, 'index']);
         Route::post('farms/{farm}/feed/stock', [FeedController::class, 'storeStock']);
         Route::post('farms/{farm}/feed/usage', [FeedController::class, 'storeUsage']);
+        Route::get('farms/{farm}/notifications', [FarmNotificationController::class, 'index']);
+        Route::patch('farms/{farm}/notifications/{notification}/read', [FarmNotificationController::class, 'markAsRead']);
 
         Route::apiResource('crm/customers', CustomerController::class);
         Route::get('crm/customers/{customer}/interactions', [CustomerInteractionController::class, 'index']);
