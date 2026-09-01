@@ -27,10 +27,8 @@ class MpesaPaymentController extends Controller
         abort_if($plan->pig_limit !== null && $count > $plan->pig_limit, 422, 'This plan does not cover the farm herd size.');
         abort_if(strtoupper($plan->currency) !== 'KES', 422, 'M-Pesa payments require a KES subscription plan.');
 
-        $phone = preg_replace('/^\+/', '', trim($user->phone));
-        if (str_starts_with($phone, '0')) {
-            $phone = '254'.substr($phone, 1);
-        }
+        $phone = $this->normalizeKenyanPhone($user->phone);
+        abort_unless($phone, 422, 'Use a valid Kenyan M-Pesa phone number.');
 
         $payment = Payment::create([
             'farm_id' => $farm->id,
@@ -65,16 +63,21 @@ class MpesaPaymentController extends Controller
         $resultCode = (int) ($callback['ResultCode'] ?? 1);
         $payment = $checkoutId ? Payment::where('checkout_request_id', $checkoutId)->first() : null;
 
-        if (! $payment) return response()->json(['ResultCode' => 0, 'ResultDesc' => 'Accepted']);
+        if (! $payment) {
+            return response()->json(['ResultCode' => 0, 'ResultDesc' => 'Accepted']);
+        }
 
         DB::transaction(function () use ($payment, $callback, $resultCode): void {
-            if ($payment->status === 'paid') return;
+            if ($payment->status === 'paid') {
+                return;
+            }
 
             if ($resultCode !== 0) {
                 $payment->update([
                     'status' => 'failed',
                     'result_description' => $callback['ResultDesc'] ?? 'Payment failed.',
                 ]);
+
                 return;
             }
 
@@ -89,5 +92,15 @@ class MpesaPaymentController extends Controller
         });
 
         return response()->json(['ResultCode' => 0, 'ResultDesc' => 'Accepted']);
+    }
+
+    private function normalizeKenyanPhone(string $phone): ?string
+    {
+        $normalized = preg_replace('/\D+/', '', $phone);
+        if (str_starts_with($normalized, '0')) {
+            $normalized = '254'.substr($normalized, 1);
+        }
+
+        return preg_match('/^254[17]\d{8}$/', $normalized) ? $normalized : null;
     }
 }

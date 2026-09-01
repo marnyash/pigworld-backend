@@ -2,6 +2,10 @@
 
 return [
 
+    'firebase' => [
+        'project_id' => env('FIREBASE_PROJECT_ID', 'pigworld-smart'),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Third Party Services

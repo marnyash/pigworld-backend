@@ -12,6 +12,7 @@ use App\Http\Resources\UserResource;
 use App\Models\Farm;
 use App\Models\User;
 use App\Services\Auth\TokenIssuer;
+use App\Services\Auth\FirebaseIdTokenVerifier;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -21,7 +22,10 @@ use Laravel\Sanctum\PersonalAccessToken;
 
 class AuthController extends Controller
 {
-    public function __construct(private readonly TokenIssuer $tokens)
+    public function __construct(
+        private readonly TokenIssuer $tokens,
+        private readonly FirebaseIdTokenVerifier $firebaseTokens,
+    )
     {
     }
 
@@ -60,6 +64,24 @@ class AuthController extends Controller
         if ($user === null || $user->crm_closed_at !== null || ! Hash::check($request->string('password'), $user->password)) {
             // Same message whether the identifier exists or not, so we don't leak account existence.
             throw ValidationException::withMessages(['identifier' => ['These credentials do not match our records.']]);
+        }
+
+        return $this->authResponse($user);
+    }
+
+    public function loginWithGoogle(Request $request): JsonResponse
+    {
+        $idToken = $request->validate(['id_token' => ['required', 'string']])['id_token'];
+        $claims = $this->firebaseTokens->verify($idToken);
+        $email = $claims['email'] ?? null;
+
+        if (! is_string($email) || ! filter_var($email, FILTER_VALIDATE_EMAIL) || ($claims['email_verified'] ?? false) !== true) {
+            throw ValidationException::withMessages(['id_token' => ['The Google account email is not verified.']]);
+        }
+
+        $user = User::where('email', $email)->first();
+        if ($user === null || $user->crm_closed_at !== null) {
+            throw ValidationException::withMessages(['email' => ['No active Pig World account is associated with this Google email.']]);
         }
 
         return $this->authResponse($user);
