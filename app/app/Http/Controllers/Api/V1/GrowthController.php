@@ -203,15 +203,40 @@ class GrowthController extends Controller
     private function authorizeGrowthAccess(Request $request, Farm $farm, string $permission): void
     {
         $user = $request->user();
+        $membership = $user->farms()->where('farms.id', $farm->id)->first();
 
-        $farmMember = $user->farmMembers()
-            ->where('farm_id', $farm->id)
-            ->first();
+        if ($membership === null) {
+            abort(403, 'You do not have access to this farm.');
+        }
 
-        abort_if(
-            !$farmMember || !$farmMember->hasPermission($permission),
-            403,
-            'Unauthorized to access growth records'
-        );
+        if ($user->role === 'farmOwner') {
+            return;
+        }
+
+        $permissions = $membership->pivot->permissions === null
+            ? $this->defaultPermissions($user->role)
+            : json_decode($membership->pivot->permissions, true);
+
+        $aliases = [
+            'viewGrowth' => ['viewReports', 'manageHerd', 'manageHealth', 'manageGrowth'],
+            'manageGrowth' => ['manageHerd', 'manageHealth', 'manageGrowth'],
+        ];
+
+        $allowed = $permissions ?? [];
+        $matches = $aliases[$permission] ?? [$permission];
+
+        if (! array_intersect($matches, $allowed)) {
+            abort(403, 'You do not have permission to access growth records.');
+        }
+    }
+
+    private function defaultPermissions(string $role): array
+    {
+        return match ($role) {
+            'farmManager' => ['manageHerd', 'manageFeed', 'manageHealth', 'viewReports'],
+            'veterinarian' => ['viewHerd', 'manageHealth'],
+            'farmWorker' => ['viewHerd', 'viewHealth'],
+            default => [],
+        };
     }
 }
