@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\V1\FarmOverviewController;
 use App\Http\Controllers\Api\V1\FarmNotificationController;
 use App\Http\Controllers\Api\V1\MpesaPaymentController;
 use App\Http\Controllers\Api\V1\GrowthController;
+use App\Http\Controllers\Api\V1\InventoryController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -77,6 +78,17 @@ Route::prefix('v1')->group(function () {
         Route::delete('farms/{farm}/growth-records/{growthRecord}', [GrowthController::class, 'destroy']);
         Route::get('farms/{farm}/growth-overview', [GrowthController::class, 'getOverview']);
         Route::get('farms/{farm}/growth-analytics', [GrowthController::class, 'getAnalytics']);
+
+        // Inventory Routes
+        Route::get('farms/{farm}/inventory/items', [InventoryController::class, 'index']);
+        Route::post('farms/{farm}/inventory/items', [InventoryController::class, 'store']);
+        Route::get('farms/{farm}/inventory/items/{item}', [InventoryController::class, 'show']);
+        Route::patch('farms/{farm}/inventory/items/{item}', [InventoryController::class, 'update']);
+        Route::delete('farms/{farm}/inventory/items/{item}', [InventoryController::class, 'destroy']);
+        Route::post('farms/{farm}/inventory/items/{item}/movements', [InventoryController::class, 'recordMovement']);
+        Route::get('farms/{farm}/inventory/items/{item}/movements', [InventoryController::class, 'getMovements']);
+        Route::get('farms/{farm}/inventory/alerts', [InventoryController::class, 'getAlerts']);
+        Route::get('farms/{farm}/inventory/by-category', [InventoryController::class, 'getByCategory']);
     });
 
     Route::post('payments/mpesa/callback', [MpesaPaymentController::class, 'callback']);

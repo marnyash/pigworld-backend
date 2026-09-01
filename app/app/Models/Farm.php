@@ -92,4 +92,10 @@ class Farm extends Model
     {
         return $this->hasMany(GrowthRecord::class);
     }
+
+    /** @return HasMany<InventoryItem, Farm> */
+    public function inventoryItems(): HasMany
+    {
+        return $this->hasMany(InventoryItem::class);
+    }
 }
