@@ -86,4 +86,10 @@ class Farm extends Model
     {
         return $this->hasMany(HealthRecord::class);
     }
+
+    /** @return HasMany<GrowthRecord, Farm> */
+    public function growthRecords(): HasMany
+    {
+        return $this->hasMany(GrowthRecord::class);
+    }
 }

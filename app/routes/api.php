@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\V1\FeedController;
 use App\Http\Controllers\Api\V1\FarmOverviewController;
 use App\Http\Controllers\Api\V1\FarmNotificationController;
 use App\Http\Controllers\Api\V1\MpesaPaymentController;
+use App\Http\Controllers\Api\V1\GrowthController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -68,6 +69,14 @@ Route::prefix('v1')->group(function () {
         Route::delete('farms/{farm}/health-records/{healthRecord}', [HealthController::class, 'destroy']);
         Route::get('farms/{farm}/health-alerts', [HealthController::class, 'getAlerts']);
         Route::get('farms/{farm}/health-analytics', [HealthController::class, 'getAnalytics']);
+
+        Route::get('farms/{farm}/growth-records', [GrowthController::class, 'index']);
+        Route::post('farms/{farm}/growth-records', [GrowthController::class, 'store']);
+        Route::get('farms/{farm}/growth-records/{growthRecord}', [GrowthController::class, 'show']);
+        Route::patch('farms/{farm}/growth-records/{growthRecord}', [GrowthController::class, 'update']);
+        Route::delete('farms/{farm}/growth-records/{growthRecord}', [GrowthController::class, 'destroy']);
+        Route::get('farms/{farm}/growth-overview', [GrowthController::class, 'getOverview']);
+        Route::get('farms/{farm}/growth-analytics', [GrowthController::class, 'getAnalytics']);
     });
 
     Route::post('payments/mpesa/callback', [MpesaPaymentController::class, 'callback']);
