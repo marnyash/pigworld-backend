@@ -1,12 +1,12 @@
 #!/bin/bash
-# Automated backend deployment script for cPanel
-# Usage: ./deploy-backend.sh
+# Automated backend deployment script for cPanel.
+# Usage: BACKEND_DIR=/home/account/apps/pigworld-api ./deploy-backend.sh
 
 set -e
 
-BACKEND_DIR=~/backend/app
-API_DOMAIN="api.pigworldsmart.com"
-MAIN_DOMAIN="pigworldsmart.com"
+BACKEND_DIR="${BACKEND_DIR:-$HOME/apps/pigworld-api}"
+API_DOMAIN="${API_DOMAIN:-api.pigworldsmart.com}"
+CRM_DOMAIN="${CRM_DOMAIN:-crm.pigworldsmart.com}"
 
 echo "========================================="
 echo "Pig World Smart - Backend Deployment"
@@ -30,7 +30,7 @@ echo ""
 if [ ! -f ".env" ]; then
     echo "[3/10] Creating .env file..."
     echo "ERROR: .env does not exist. Please create it manually with production credentials."
-    echo "Use the template in DEPLOYMENT.md and replace placeholders."
+    echo "Use the production template in DEPLOYMENT.md and add credentials only on the server."
     exit 1
 else
     echo "[3/10] Using existing .env file"
@@ -94,10 +94,9 @@ echo "========================================="
 echo "Next Steps:"
 echo "========================================="
 echo "1. Build CRM: VITE_API_BASE_URL=https://$API_DOMAIN/api/v1 npm run build"
-echo "2. Upload dist/ to https://$MAIN_DOMAIN/app/"
+echo "2. Upload dist/ to https://$CRM_DOMAIN/"
 echo "3. Test API: curl https://$API_DOMAIN/up"
-echo "4. Open browser: https://$MAIN_DOMAIN/app/"
-echo "5. Log in with: email=test@example.com, password=password"
+echo "4. Open browser: https://$CRM_DOMAIN/"
 echo ""
 echo "For detailed instructions, see DEPLOYMENT.md"
 echo "========================================="
