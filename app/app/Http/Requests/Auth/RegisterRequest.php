@@ -19,9 +19,9 @@ class RegisterRequest extends FormRequest
             'phone' => ['required', 'string', 'max:30', 'unique:users,phone'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
             'role' => ['required', 'string', 'in:farmOwner,farmManager,farmWorker'],
-            // Farm owners name the farm they are creating; managers/workers join an existing farm via its invite code.
+            // Farm owners name the farm they are creating; managers/workers may join later by requesting a farm.
             'farm_name' => ['required_if:role,farmOwner', 'string', 'max:255'],
-            'invite_code' => ['required_unless:role,farmOwner', 'string', 'exists:farms,invite_code'],
+            'invite_code' => ['nullable', 'string', 'exists:farms,invite_code'],
             'mother_pig_count' => ['nullable', 'integer', 'min:0'],
             'piglet_groups' => ['nullable', 'array'],
             'piglet_groups.*.count' => ['required', 'integer', 'min:0'],

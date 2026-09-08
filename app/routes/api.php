@@ -4,6 +4,8 @@ use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CustomerController;
 use App\Http\Controllers\Api\V1\CustomerInteractionController;
 use App\Http\Controllers\Api\V1\FarmMemberController;
+use App\Http\Controllers\Api\V1\FarmController;
+use App\Http\Controllers\Api\V1\FarmJoinRequestController;
 use App\Http\Controllers\Api\V1\FarmSubscriptionController;
 use App\Http\Controllers\Api\V1\HealthController;
 use App\Http\Controllers\Api\V1\HerdController;
@@ -31,6 +33,9 @@ Route::prefix('v1')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/auth/logout', [AuthController::class, 'logout']);
         Route::get('/auth/me', [AuthController::class, 'me']);
+        Route::get('/auth/join-requests', [FarmJoinRequestController::class, 'mine']);
+        Route::post('farms', [FarmController::class, 'store']);
+        Route::post('farm-join-requests', [FarmJoinRequestController::class, 'store']);
         Route::get('farms/{farm}/overview', [FarmOverviewController::class, 'show']);
         Route::get('farms/{farm}/feed', [FeedController::class, 'index']);
         Route::post('farms/{farm}/feed/stock', [FeedController::class, 'storeStock']);
@@ -55,6 +60,8 @@ Route::prefix('v1')->group(function () {
 
         Route::get('farms/{farm}/members', [FarmMemberController::class, 'index']);
         Route::patch('farms/{farm}/members/{user}', [FarmMemberController::class, 'update']);
+        Route::get('farms/{farm}/join-requests', [FarmJoinRequestController::class, 'index']);
+        Route::patch('farms/{farm}/join-requests/{farmJoinRequest}', [FarmJoinRequestController::class, 'review']);
         Route::patch('farms/{farm}/subscription', [FarmSubscriptionController::class, 'update']);
         Route::post('farms/{farm}/subscription/payment', [MpesaPaymentController::class, 'store']);
         Route::get('farms/{farm}/animals', [HerdController::class, 'index']);

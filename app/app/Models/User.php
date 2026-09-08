@@ -25,6 +25,12 @@ class User extends Authenticatable
         return $this->belongsToMany(Farm::class)->withPivot('permissions')->withTimestamps();
     }
 
+    /** @return \Illuminate\Database\Eloquent\Relations\HasMany<FarmJoinRequest, User> */
+    public function farmJoinRequests(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(FarmJoinRequest::class);
+    }
+
     /** @return \Illuminate\Database\Eloquent\Relations\HasMany<RefreshToken, User> */
     public function refreshTokens(): \Illuminate\Database\Eloquent\Relations\HasMany
     {

@@ -39,7 +39,9 @@ class AuthController extends Controller
                 'piglet_groups',
                 'pregnant_pig_count',
             ]) + ['name' => $request->string('farm_name')->toString()])
-            : Farm::where('invite_code', $request->string('invite_code')->toString())->firstOrFail();
+            : ($request->filled('invite_code')
+                ? Farm::where('invite_code', $request->string('invite_code')->toString())->firstOrFail()
+                : null);
 
         $user = User::create([
             'name' => $request->string('name'),
@@ -49,7 +51,9 @@ class AuthController extends Controller
             'role' => $role,
         ]);
 
-        $user->farms()->attach($farm->id);
+        if ($farm !== null) {
+            $user->farms()->attach($farm->id);
+        }
 
         return $this->authResponse($user);
     }

@@ -53,6 +53,12 @@ class Farm extends Model
         return $this->belongsToMany(User::class)->withPivot('permissions')->withTimestamps();
     }
 
+    /** @return HasMany<FarmJoinRequest, Farm> */
+    public function joinRequests(): HasMany
+    {
+        return $this->hasMany(FarmJoinRequest::class);
+    }
+
     /** @return HasMany<Customer, Farm> */
     public function customers(): HasMany
     {
