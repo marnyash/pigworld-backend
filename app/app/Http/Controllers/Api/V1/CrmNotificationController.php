@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\FarmNotification;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -38,6 +39,17 @@ class CrmNotificationController extends Controller
         }
         if (!empty($data['recipient_id']) && !User::whereKey($data['recipient_id'])->whereHas('farms', fn ($query) => $query->where('farms.id', $data['farm_id']))->exists()) abort(422, 'Recipient is not a member of this farm.');
         $id = \DB::table('crm_notifications')->insertGetId([...$data, 'sender_id' => $user->id, 'created_at' => now(), 'updated_at' => now()]);
+        FarmNotification::create([
+            'farm_id' => $data['farm_id'],
+            'recipient_id' => $data['recipient_id'] ?? null,
+            'type' => 'crm_message',
+            'title' => 'Message from your farm team',
+            'body' => $data['message'],
+            'severity' => 'info',
+            'related_type' => 'crm_notification',
+            'related_id' => $id,
+            'action_route' => '/notifications',
+        ]);
         return response()->json(['data' => \DB::table('crm_notifications')->find($id)], 201);
     }
 

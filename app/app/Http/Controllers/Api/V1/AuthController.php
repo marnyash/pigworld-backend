@@ -125,6 +125,33 @@ class AuthController extends Controller
         ]);
     }
 
+    public function updateProfile(Request $request): JsonResponse
+    {
+        $data = $request->validate(['name' => ['required', 'string', 'max:255']]);
+        $request->user()->update($data);
+
+        return response()->json(['user' => new UserResource($request->user()->fresh())]);
+    }
+
+    public function changePassword(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'current_password' => ['required', 'string'],
+            'new_password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        $user = $request->user();
+        if (! Hash::check($data['current_password'], $user->password)) {
+            throw ValidationException::withMessages([
+                'current_password' => ['The current password is incorrect.'],
+            ]);
+        }
+
+        $user->update(['password' => Hash::make($data['new_password'])]);
+
+        return response()->json(['message' => 'Password changed successfully.']);
+    }
+
     public function forgotPassword(ForgotPasswordRequest $request): JsonResponse
     {
         // Always respond the same way to avoid revealing whether an account exists for this email.

@@ -33,8 +33,11 @@ Route::prefix('v1')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/auth/logout', [AuthController::class, 'logout']);
         Route::get('/auth/me', [AuthController::class, 'me']);
+        Route::patch('/auth/profile', [AuthController::class, 'updateProfile']);
+        Route::post('/auth/change-password', [AuthController::class, 'changePassword']);
         Route::get('/auth/join-requests', [FarmJoinRequestController::class, 'mine']);
         Route::post('farms', [FarmController::class, 'store']);
+        Route::patch('farms/{farm}', [FarmController::class, 'update']);
         Route::post('farm-join-requests', [FarmJoinRequestController::class, 'store']);
         Route::get('farms/{farm}/overview', [FarmOverviewController::class, 'show']);
         Route::get('farms/{farm}/feed', [FeedController::class, 'index']);
