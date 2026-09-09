@@ -38,6 +38,22 @@ class User extends Authenticatable
     }
 
     /**
+     * Backward-compatible accessor for legacy code that still expects a user-level
+     * farm-members collection.
+     *
+     * @return \Illuminate\Support\Collection<int, User>
+     */
+    public function farmMembers()
+    {
+        return $this->farms()
+            ->with('users')
+            ->get()
+            ->flatMap(fn (Farm $farm) => $farm->users)
+            ->unique('id')
+            ->values();
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>

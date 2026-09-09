@@ -90,6 +90,21 @@ class AuthApiTest extends TestCase
         $this->assertSame(0, RefreshToken::where('user_id', $user->id)->whereNull('revoked_at')->count());
     }
 
+    public function test_user_can_lookup_legacy_farm_members_collection(): void
+    {
+        $owner = User::factory()->create(['role' => 'farmOwner']);
+        $member = User::factory()->create(['role' => 'farmMember']);
+        $farm = Farm::create(['name' => 'Legacy Farm']);
+
+        $owner->farms()->attach($farm);
+        $farm->users()->attach($member);
+
+        $members = $owner->farmMembers();
+
+        $this->assertTrue($members->contains(fn (User $user) => $user->id === $owner->id));
+        $this->assertTrue($members->contains(fn (User $user) => $user->id === $member->id));
+    }
+
     public function test_seeded_tester_can_login_outside_production(): void
     {
         $this->seed();
