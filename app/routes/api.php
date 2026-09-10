@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\V1\HerdController;
 use App\Http\Controllers\Api\V1\CrmMemberController;
 use App\Http\Controllers\Api\V1\CrmNotificationController;
 use App\Http\Controllers\Api\V1\CrmReportController;
+use App\Http\Controllers\Api\V1\CrmDashboardController;
 use App\Http\Controllers\Api\V1\SubscriptionPlanController;
 use App\Http\Controllers\Api\V1\FeedController;
 use App\Http\Controllers\Api\V1\FarmOverviewController;
@@ -63,6 +64,7 @@ Route::prefix('v1')->group(function () {
         Route::delete('crm/members/{user}', [CrmMemberController::class, 'destroy']);
         Route::get('crm/notifications', [CrmNotificationController::class, 'index']);
         Route::post('crm/notifications', [CrmNotificationController::class, 'store']);
+        Route::get('crm/dashboard/overview', [CrmDashboardController::class, 'overview']);
         Route::get('crm/reports/overview', [CrmReportController::class, 'overview']);
         Route::get('subscription-plans', [SubscriptionPlanController::class, 'index']);
         Route::post('subscription-plans', [SubscriptionPlanController::class, 'store']);

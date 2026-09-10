@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Customer;
+use App\Models\CrmTask;
 use App\Models\Farm;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -75,5 +76,58 @@ class CrmWorkflowApiTest extends TestCase
             ])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('assigned_to');
+    }
+
+    public function test_crm_dashboard_returns_farm_scoped_operational_metrics(): void
+    {
+        $admin = User::factory()->create(['role' => 'farmOwner']);
+        $support = User::factory()->create(['role' => 'farmWorker', 'crm_role' => 'customer_support']);
+        $otherFarm = Farm::create(['name' => 'Other Farm']);
+        $farm = Farm::create(['name' => 'Dashboard Farm']);
+        $farm->users()->attach([$admin->id, $support->id]);
+        $otherFarm->users()->attach(User::factory()->create(['role' => 'farmOwner'])->id);
+
+        $customer = Customer::create([
+            'farm_id' => $farm->id,
+            'created_by' => $admin->id,
+            'name' => 'Dashboard Customer',
+            'status' => 'qualified',
+        ]);
+        Customer::create([
+            'farm_id' => $otherFarm->id,
+            'created_by' => $admin->id,
+            'name' => 'Other Customer',
+            'status' => 'won',
+        ]);
+        CrmTask::create([
+            'farm_id' => $farm->id,
+            'customer_id' => $customer->id,
+            'created_by' => $admin->id,
+            'title' => 'Due today',
+            'due_at' => now()->addHours(2),
+            'assigned_to' => $support->id,
+        ]);
+
+        $this->actingAs($support, 'sanctum')
+            ->getJson('/api/v1/crm/dashboard/overview?farm_id='.$farm->id)
+            ->assertOk()
+            ->assertJsonPath('data.customers.total', 1)
+            ->assertJsonPath('data.customers.qualified', 1)
+            ->assertJsonPath('data.customers.by_status.qualified', 1)
+            ->assertJsonPath('data.tasks.due_today', 1)
+            ->assertJsonPath('data.tasks.items.0.customer_name', 'Dashboard Customer')
+            ->assertJsonPath('data.staff.0.open_tasks', 1);
+    }
+
+    public function test_crm_dashboard_rejects_another_farm(): void
+    {
+        $user = User::factory()->create(['role' => 'farmWorker', 'crm_role' => 'customer_support']);
+        $farm = Farm::create(['name' => 'Accessible Farm']);
+        $otherFarm = Farm::create(['name' => 'Restricted Farm']);
+        $farm->users()->attach($user->id);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/crm/dashboard/overview?farm_id='.$otherFarm->id)
+            ->assertForbidden();
     }
 }
