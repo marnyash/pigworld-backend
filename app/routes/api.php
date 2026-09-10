@@ -46,6 +46,7 @@ Route::prefix('v1')->group(function () {
         Route::post('farms/{farm}/feed/stock', [FeedController::class, 'storeStock']);
         Route::post('farms/{farm}/feed/usage', [FeedController::class, 'storeUsage']);
         Route::get('farms/{farm}/notifications', [FarmNotificationController::class, 'index']);
+        Route::post('farms/{farm}/notifications/messages', [FarmNotificationController::class, 'sendMessage']);
         Route::patch('farms/{farm}/notifications/{notification}/read', [FarmNotificationController::class, 'markAsRead']);
 
         Route::apiResource('crm/customers', CustomerController::class);

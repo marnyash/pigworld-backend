@@ -16,9 +16,13 @@ class CrmNotificationController extends Controller
         $this->crmStaff($user);
         $farmId = $request->integer('farm_id');
         if (! $user->farms()->where('farms.id', $farmId)->exists()) abort(403, 'You do not have access to this farm.');
-        $items = \DB::table('crm_notifications')->where('farm_id', $farmId)
-            ->where(fn ($query) => $query->whereNull('recipient_id')->orWhere('recipient_id', $user->id))
-            ->latest()->limit(50)->get();
+        $items = \DB::table('crm_notifications')
+            ->leftJoin('users as senders', 'senders.id', '=', 'crm_notifications.sender_id')
+            ->leftJoin('users as recipients', 'recipients.id', '=', 'crm_notifications.recipient_id')
+            ->select('crm_notifications.*', 'senders.name as sender_name', 'senders.email as sender_email', 'recipients.name as recipient_name')
+            ->where('crm_notifications.farm_id', $farmId)
+            ->where(fn ($query) => $query->whereNull('crm_notifications.recipient_id')->orWhere('crm_notifications.recipient_id', $user->id))
+            ->latest('crm_notifications.created_at')->limit(50)->get();
         return response()->json(['data' => $items]);
     }
 
