@@ -14,6 +14,7 @@ class CustomerResource extends JsonResource
         return [
             'id' => (string) $this->id,
             'farm_id' => (string) $this->farm_id,
+            'farm_name' => $this->whenLoaded('farm', fn () => $this->farm?->name),
             'assigned_user_id' => $this->assigned_user_id !== null ? (string) $this->assigned_user_id : null,
             'assignee' => $this->whenLoaded('assignee', fn () => $this->assignee ? [
                 'id' => (string) $this->assignee->id,

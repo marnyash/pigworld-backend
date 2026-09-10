@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Customer;
 use App\Models\CrmTask;
 use App\Models\Farm;
+use App\Models\CustomerOrder;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -129,5 +130,54 @@ class CrmWorkflowApiTest extends TestCase
         $this->actingAs($user, 'sanctum')
             ->getJson('/api/v1/crm/dashboard/overview?farm_id='.$otherFarm->id)
             ->assertForbidden();
+    }
+
+    public function test_directory_groups_accessible_farm_members_by_role(): void
+    {
+        $support = User::factory()->create(['role' => 'farmWorker', 'crm_role' => 'customer_support']);
+        $owner = User::factory()->create(['role' => 'farmOwner']);
+        $manager = User::factory()->create(['role' => 'farmManager']);
+        $worker = User::factory()->create(['role' => 'farmWorker']);
+        $farm = Farm::create(['name' => 'Directory Farm']);
+        $farm->users()->attach([$support->id, $owner->id, $manager->id, $worker->id]);
+
+        $this->actingAs($support, 'sanctum')
+            ->getJson('/api/v1/crm/directories/overview')
+            ->assertOk()
+            ->assertJsonFragment(['name' => $owner->name, 'farm_name' => 'Directory Farm', 'role' => 'farmOwner'])
+            ->assertJsonFragment(['name' => $manager->name, 'farm_name' => 'Directory Farm', 'role' => 'farmManager'])
+            ->assertJsonFragment(['name' => $worker->name, 'farm_name' => 'Directory Farm', 'role' => 'farmWorker'])
+            ->assertJsonPath('data.relationships.0.farm_name', 'Directory Farm')
+            ->assertJsonPath('data.relationships.0.owner.name', $owner->name)
+            ->assertJsonCount(1, 'data.relationships.0.managers')
+            ->assertJsonCount(2, 'data.relationships.0.workers');
+    }
+
+    public function test_customer_orders_are_scoped_and_filterable_by_status(): void
+    {
+        $admin = User::factory()->create(['role' => 'farmOwner']);
+        $farm = Farm::create(['name' => 'Orders Farm']);
+        $farm->users()->attach($admin->id);
+        $customer = Customer::create(['farm_id' => $farm->id, 'created_by' => $admin->id, 'name' => 'Order Customer']);
+
+        $this->actingAs($admin, 'sanctum')
+            ->postJson('/api/v1/crm/orders', [
+                'farm_id' => $farm->id,
+                'customer_id' => $customer->id,
+                'reference' => 'ORD-001',
+                'status' => 'pending',
+                'total_amount' => 12500,
+                'currency' => 'KES',
+                'ordered_at' => '2026-09-10',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.reference', 'ORD-001')
+            ->assertJsonPath('data.customer_name', 'Order Customer');
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/v1/crm/orders?status=pending')
+            ->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.status', 'pending');
     }
 }

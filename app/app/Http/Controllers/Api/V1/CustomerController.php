@@ -21,7 +21,7 @@ class CustomerController extends Controller
 
         $customers = Customer::query()
             ->whereIn('farm_id', $farmIds)
-            ->with('assignee:id,name,email,crm_role')
+            ->with(['assignee:id,name,email,crm_role', 'farm:id,name'])
             ->withCount(['tasks as open_tasks_count' => fn ($query) => $query->where('status', 'open')])
             ->withMin(['tasks as next_task_due_at' => fn ($query) => $query->where('status', 'open')->whereNotNull('due_at')], 'due_at')
             ->when($request->filled('farm_id'), fn ($query) => $query->where('farm_id', $request->integer('farm_id')))
@@ -62,7 +62,7 @@ class CustomerController extends Controller
         $this->authorizeCrmAccess($request);
         $this->authorizeFarm($request, $customer->farm_id);
 
-        return response()->json(['data' => new CustomerResource($customer->load('assignee:id,name,email,crm_role'))]);
+        return response()->json(['data' => new CustomerResource($customer->load(['assignee:id,name,email,crm_role', 'farm:id,name']))]);
     }
 
     public function update(UpdateCustomerRequest $request, Customer $customer): JsonResponse

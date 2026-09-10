@@ -48,4 +48,10 @@ class Customer extends Model
     {
         return $this->hasMany(CustomerInteraction::class)->latest('occurred_at');
     }
+
+    /** @return HasMany<CustomerOrder, Customer> */
+    public function orders(): HasMany
+    {
+        return $this->hasMany(CustomerOrder::class);
+    }
 }
