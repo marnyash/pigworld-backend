@@ -16,6 +16,7 @@ class StoreCustomerRequest extends FormRequest
     {
         return [
             'farm_id' => ['required', 'integer', Rule::exists('farms', 'id')],
+            'assigned_user_id' => ['nullable', 'integer', Rule::exists('users', 'id')],
             'name' => ['required', 'string', 'max:255'],
             'email' => ['nullable', 'string', 'email', 'max:255'],
             'phone' => ['nullable', 'string', 'max:30'],

@@ -7,6 +7,7 @@ use App\Models\Farm;
 use App\Models\SubscriptionPlan;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
@@ -23,8 +24,9 @@ class DatabaseSeeder extends Seeder
         } else {
             $user = User::updateOrCreate(['email' => 'test@example.com'], [
                 'name' => 'Test User',
-                'password' => 'password',
+                'password' => Hash::make('password'),
                 'role' => 'farmOwner',
+                'crm_role' => 'admin',
             ]);
 
             $farm = Farm::firstOrCreate([

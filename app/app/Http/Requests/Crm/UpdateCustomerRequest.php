@@ -16,6 +16,7 @@ class UpdateCustomerRequest extends FormRequest
     {
         return [
             'name' => ['sometimes', 'string', 'max:255'],
+            'assigned_user_id' => ['nullable', 'integer', Rule::exists('users', 'id')],
             'email' => ['nullable', 'string', 'email', 'max:255'],
             'phone' => ['nullable', 'string', 'max:30'],
             'company' => ['nullable', 'string', 'max:255'],

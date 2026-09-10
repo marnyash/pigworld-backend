@@ -1,3 +1,10 @@
+<IfModule mod_headers.c>
+    Header always set Access-Control-Allow-Origin "https://crm.pigworldsmart.com"
+    Header always set Access-Control-Allow-Methods "GET, POST, PATCH, DELETE, OPTIONS"
+    Header always set Access-Control-Allow-Headers "Authorization, Content-Type, Accept, X-Requested-With"
+    Header always set Vary "Origin"
+</IfModule>
+
 <IfModule mod_rewrite.c>
     <IfModule mod_negotiation.c>
         Options -MultiViews -Indexes

@@ -3,6 +3,8 @@
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CustomerController;
 use App\Http\Controllers\Api\V1\CustomerInteractionController;
+use App\Http\Controllers\Api\V1\CrmTaskController;
+use App\Http\Controllers\Api\V1\CrmCustomerEventController;
 use App\Http\Controllers\Api\V1\FarmMemberController;
 use App\Http\Controllers\Api\V1\FarmController;
 use App\Http\Controllers\Api\V1\FarmJoinRequestController;
@@ -49,6 +51,11 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('crm/customers', CustomerController::class);
         Route::get('crm/customers/{customer}/interactions', [CustomerInteractionController::class, 'index']);
         Route::post('crm/customers/{customer}/interactions', [CustomerInteractionController::class, 'store']);
+        Route::get('crm/customers/{customer}/tasks', [CrmTaskController::class, 'index']);
+        Route::post('crm/customers/{customer}/tasks', [CrmTaskController::class, 'store']);
+        Route::patch('crm/customers/{customer}/tasks/{task}', [CrmTaskController::class, 'update']);
+        Route::delete('crm/customers/{customer}/tasks/{task}', [CrmTaskController::class, 'destroy']);
+        Route::get('crm/customers/{customer}/timeline', [CrmCustomerEventController::class, 'timeline']);
         Route::get('crm/members', [CrmMemberController::class, 'index']);
         Route::post('crm/members', [CrmMemberController::class, 'store']);
         Route::patch('crm/members/{user}', [CrmMemberController::class, 'update']);

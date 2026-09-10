@@ -11,7 +11,7 @@ class Customer extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['farm_id', 'created_by', 'name', 'email', 'phone', 'company', 'address', 'type', 'status', 'notes'];
+    protected $fillable = ['farm_id', 'created_by', 'assigned_user_id', 'name', 'email', 'phone', 'company', 'address', 'type', 'status', 'notes'];
 
     /** @return BelongsTo<Farm, Customer> */
     public function farm(): BelongsTo
@@ -23,6 +23,24 @@ class Customer extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /** @return BelongsTo<User, Customer> */
+    public function assignee(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assigned_user_id');
+    }
+
+    /** @return HasMany<CrmTask, Customer> */
+    public function tasks(): HasMany
+    {
+        return $this->hasMany(CrmTask::class);
+    }
+
+    /** @return HasMany<CrmCustomerEvent, Customer> */
+    public function events(): HasMany
+    {
+        return $this->hasMany(CrmCustomerEvent::class)->latest('occurred_at');
     }
 
     /** @return HasMany<CustomerInteraction, Customer> */

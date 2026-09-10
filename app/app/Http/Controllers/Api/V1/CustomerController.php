@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Crm\StoreCustomerRequest;
 use App\Http\Requests\Crm\UpdateCustomerRequest;
 use App\Http\Resources\Crm\CustomerResource;
+use App\Models\CrmCustomerEvent;
 use App\Models\Customer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -20,7 +21,11 @@ class CustomerController extends Controller
 
         $customers = Customer::query()
             ->whereIn('farm_id', $farmIds)
+            ->with('assignee:id,name,email,crm_role')
+            ->withCount(['tasks as open_tasks_count' => fn ($query) => $query->where('status', 'open')])
+            ->withMin(['tasks as next_task_due_at' => fn ($query) => $query->where('status', 'open')->whereNotNull('due_at')], 'due_at')
             ->when($request->filled('farm_id'), fn ($query) => $query->where('farm_id', $request->integer('farm_id')))
+            ->when($request->filled('assigned_to'), fn ($query) => $query->where('assigned_user_id', $request->integer('assigned_to')))
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')))
             ->when($request->filled('type'), fn ($query) => $query->where('type', $request->string('type')))
             ->when($request->filled('search'), function ($query) use ($request) {
@@ -41,13 +46,15 @@ class CustomerController extends Controller
     {
         $this->authorizeCrmAction($request, 'write');
         $this->authorizeFarm($request, $request->integer('farm_id'));
+        $this->validateAssignee($request, $request->integer('farm_id'), $request->input('assigned_user_id'));
 
         $customer = Customer::create([
             ...$request->validated(),
             'created_by' => $request->user()->id,
         ]);
+        $this->recordEvent($customer, $request, 'customer_created', []);
 
-        return response()->json(['data' => new CustomerResource($customer)], 201);
+        return response()->json(['data' => new CustomerResource($customer->load('assignee:id,name,email,crm_role'))], 201);
     }
 
     public function show(Request $request, Customer $customer): JsonResponse
@@ -55,7 +62,7 @@ class CustomerController extends Controller
         $this->authorizeCrmAccess($request);
         $this->authorizeFarm($request, $customer->farm_id);
 
-        return response()->json(['data' => new CustomerResource($customer)]);
+        return response()->json(['data' => new CustomerResource($customer->load('assignee:id,name,email,crm_role'))]);
     }
 
     public function update(UpdateCustomerRequest $request, Customer $customer): JsonResponse
@@ -64,9 +71,19 @@ class CustomerController extends Controller
         $this->authorizeCrmAction($request, 'write');
         $this->authorizeFarm($request, $customer->farm_id);
 
-        $customer->update($request->validated());
+        $data = $request->validated();
+        $this->validateAssignee($request, $customer->farm_id, $data['assigned_user_id'] ?? $customer->assigned_user_id);
+        $previousStatus = $customer->status;
+        $previousAssignee = $customer->assigned_user_id;
+        $customer->update($data);
+        if (array_key_exists('status', $data) && $previousStatus !== $customer->status) {
+            $this->recordEvent($customer, $request, 'status_changed', ['from' => $previousStatus, 'to' => $customer->status]);
+        }
+        if (array_key_exists('assigned_user_id', $data) && (int) $previousAssignee !== (int) $customer->assigned_user_id) {
+            $this->recordEvent($customer, $request, 'assignment_changed', ['from' => $previousAssignee, 'to' => $customer->assigned_user_id]);
+        }
 
-        return response()->json(['data' => new CustomerResource($customer)]);
+        return response()->json(['data' => new CustomerResource($customer->load('assignee:id,name,email,crm_role'))]);
     }
 
     public function destroy(Request $request, Customer $customer): JsonResponse
@@ -102,5 +119,31 @@ class CustomerController extends Controller
         if (! in_array($role, ['admin', 'finance', 'customer_support'], true)) {
             abort(403, 'Only CRM staff can access customer records.');
         }
+    }
+
+    private function validateAssignee(Request $request, int $farmId, mixed $userId): void
+    {
+        if ($userId === null) return;
+        $assignee = $request->user()->farms()
+            ->where('farms.id', $farmId)
+            ->with(['users' => fn ($query) => $query->whereKey($userId)])
+            ->first()
+            ?->users
+            ?->first();
+        $role = $assignee?->crm_role ?? ($assignee?->role === 'farmOwner' ? 'admin' : null);
+        if ($assignee === null || ! in_array($role, ['admin', 'finance', 'customer_support'], true)) {
+            throw ValidationException::withMessages(['assigned_user_id' => ['The assignee must be CRM staff in this farm.']]);
+        }
+    }
+
+    private function recordEvent(Customer $customer, Request $request, string $type, array $data): void
+    {
+        CrmCustomerEvent::create([
+            'customer_id' => $customer->id,
+            'user_id' => $request->user()->id,
+            'type' => $type,
+            'data' => $data,
+            'occurred_at' => now(),
+        ]);
     }
 }
