@@ -1,10 +1,10 @@
 #!/bin/bash
 # Automated backend deployment script for cPanel.
-# Usage: BACKEND_DIR=/home/account/apps/pigworld-api ./deploy-backend.sh
+# Usage: BACKEND_DIR=/home/account/apps/pigworld-api/backend/app ./deploy-backend.sh
 
 set -e
 
-BACKEND_DIR="${BACKEND_DIR:-$HOME/apps/pigworld-api}"
+BACKEND_DIR="${BACKEND_DIR:-$HOME/apps/pigworld-api/backend/app}"
 API_DOMAIN="${API_DOMAIN:-api.pigworldsmart.com}"
 CRM_DOMAIN="${CRM_DOMAIN:-crm.pigworldsmart.com}"
 
@@ -38,14 +38,43 @@ else
 fi
 echo ""
 
+# Prevent Docker-only settings from reaching a cPanel deployment.
+DB_HOST_VALUE=$(sed -n 's/^DB_HOST=//p' .env | tail -n1)
+CACHE_STORE_VALUE=$(sed -n 's/^CACHE_STORE=//p' .env | tail -n1)
+SESSION_DRIVER_VALUE=$(sed -n 's/^SESSION_DRIVER=//p' .env | tail -n1)
+
+if [ "$DB_HOST_VALUE" = "mysql" ]; then
+    echo "ERROR: DB_HOST=mysql is a Docker-only setting. Set DB_HOST=localhost (or the cPanel database host) in .env."
+    exit 1
+fi
+
+if [ "$CACHE_STORE_VALUE" = "database" ] || [ -z "$CACHE_STORE_VALUE" ]; then
+    echo "ERROR: CACHE_STORE must be file on cPanel. Set CACHE_STORE=file in .env."
+    exit 1
+fi
+
+if [ "$SESSION_DRIVER_VALUE" = "database" ]; then
+    echo "ERROR: SESSION_DRIVER=database requires a working database. Set SESSION_DRIVER=file on cPanel."
+    exit 1
+fi
+
+# Clear caches that do not require a database connection. The database cache
+# store cannot be cleared until the production DB settings have been verified.
+echo "[4/10] Clearing stale Laravel caches..."
+php artisan config:clear
+php artisan route:clear
+php artisan view:clear
+echo "✓ Laravel caches cleared"
+echo ""
+
 # Install dependencies
-echo "[4/10] Installing Composer dependencies..."
+echo "[5/10] Installing Composer dependencies..."
 composer install --no-dev --optimize-autoloader
 echo "✓ Dependencies installed"
 echo ""
 
 # Generate APP_KEY if not set
-echo "[5/10] Checking APP_KEY..."
+echo "[6/10] Checking APP_KEY..."
 if grep -q "APP_KEY=$" .env; then
     echo "⚠ APP_KEY not set. Generating..."
     NEW_KEY=$(php -r 'echo base64_encode(random_bytes(32));')
@@ -57,19 +86,19 @@ fi
 echo ""
 
 # Run migrations
-echo "[6/10] Running database migrations..."
+echo "[7/10] Running database migrations..."
 php artisan migrate --force
 echo "✓ Migrations completed"
 echo ""
 
 # Set permissions
-echo "[7/10] Setting permissions..."
+echo "[8/10] Setting permissions..."
 chmod -R 775 storage bootstrap/cache
 echo "✓ Permissions set for storage and cache"
 echo ""
 
 # Cache configuration
-echo "[8/10] Caching configuration..."
+echo "[9/10] Caching configuration..."
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache
@@ -77,7 +106,7 @@ echo "✓ Configuration cached"
 echo ""
 
 # Test API health
-echo "[9/10] Testing API health..."
+echo "[10/10] Testing API health..."
 HEALTH_CHECK=$(curl -s https://$API_DOMAIN/up || echo "FAILED")
 if echo "$HEALTH_CHECK" | grep -q "ok"; then
     echo "✓ API health check passed"
@@ -88,7 +117,7 @@ fi
 echo ""
 
 # Summary
-echo "[10/10] Deployment complete!"
+echo "[11/11] Deployment complete!"
 echo ""
 echo "========================================="
 echo "Next Steps:"
