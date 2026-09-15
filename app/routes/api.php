@@ -24,6 +24,7 @@ use App\Http\Controllers\Api\V1\FarmNotificationController;
 use App\Http\Controllers\Api\V1\MpesaPaymentController;
 use App\Http\Controllers\Api\V1\GrowthController;
 use App\Http\Controllers\Api\V1\InventoryController;
+use App\Http\Controllers\Api\V1\PregnancyController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -89,6 +90,9 @@ Route::prefix('v1')->group(function () {
         Route::get('farms/{farm}/animals/{animal}', [HerdController::class, 'show']);
         Route::patch('farms/{farm}/animals/{animal}', [HerdController::class, 'update']);
         Route::delete('farms/{farm}/animals/{animal}', [HerdController::class, 'destroy']);
+
+        Route::apiResource('farms/{farm}/pregnancies', PregnancyController::class)
+            ->except(['create', 'edit']);
 
         Route::get('farms/{farm}/health-records', [HealthController::class, 'index']);
         Route::post('farms/{farm}/health-records', [HealthController::class, 'store']);
