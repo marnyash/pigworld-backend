@@ -55,6 +55,7 @@ class CrmDirectoryController extends Controller
                 'owner' => $this->memberSummary($users->firstWhere('role', 'farmOwner'), $farm->id, $farm->name),
                 'managers' => $users->where('role', 'farmManager')->values()->map(fn ($member) => $this->memberSummary($member, $farm->id, $farm->name))->values(),
                 'workers' => $users->where('role', 'farmWorker')->values()->map(fn ($member) => $this->memberSummary($member, $farm->id, $farm->name))->values(),
+                'status' => $users->contains(fn ($member) => $member->role === 'farmOwner' && ! $member->crm_closed_at) ? 'active' : 'attention',
             ];
         })->values();
 
