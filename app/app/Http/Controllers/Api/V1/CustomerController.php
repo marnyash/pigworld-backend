@@ -19,6 +19,14 @@ class CustomerController extends Controller
         $this->authorizeCrmAccess($request);
         $farmIds = $request->user()->farms()->pluck('farms.id');
 
+        $sortBy = $request->string('sort_by', 'latest')->toString();
+        $sortDirection = $request->string('sort_direction', 'desc')->lower()->toString() === 'asc' ? 'asc' : 'desc';
+        $sortColumns = [
+            'name' => 'name',
+            'status' => 'status',
+            'created_at' => 'created_at',
+            'updated_at' => 'updated_at',
+        ];
         $customers = Customer::query()
             ->whereIn('farm_id', $farmIds)
             ->with(['assignee:id,name,email,crm_role', 'farm:id,name'])
@@ -36,10 +44,19 @@ class CustomerController extends Controller
                         ->orWhere('company', 'like', "%{$term}%");
                 });
             })
-            ->latest()
-            ->get();
+            ->when(isset($sortColumns[$sortBy]), fn ($query) => $query->orderBy($sortColumns[$sortBy], $sortDirection))
+            ->when($sortBy === 'latest', fn ($query) => $query->latest())
+            ->paginate(min(max($request->integer('per_page', 25), 10), 100));
 
-        return response()->json(['data' => CustomerResource::collection($customers)]);
+        return response()->json([
+            'data' => CustomerResource::collection($customers->items()),
+            'meta' => [
+                'current_page' => $customers->currentPage(),
+                'last_page' => $customers->lastPage(),
+                'per_page' => $customers->perPage(),
+                'total' => $customers->total(),
+            ],
+        ]);
     }
 
     public function store(StoreCustomerRequest $request): JsonResponse
