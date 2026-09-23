@@ -34,6 +34,23 @@ class CrmReportController extends Controller
             ->when($farmId !== null, fn ($query) => $query->where('farm_id', $farmId))
             ->where('status', 'paid')
             ->sum('amount');
+        $payments = Payment::query()
+            ->whereIn('farm_id', $farmIds)
+            ->when($farmId !== null, fn ($query) => $query->where('farm_id', $farmId))
+            ->with('farm:id,name')
+            ->latest()
+            ->limit(50)
+            ->get()
+            ->map(fn (Payment $payment): array => [
+                'id' => (string) $payment->id,
+                'farm_name' => $payment->farm?->name,
+                'plan_code' => $payment->plan_code,
+                'amount' => (float) $payment->amount,
+                'currency' => $payment->currency,
+                'status' => $payment->status,
+                'paid_at' => $payment->paid_at?->toIso8601String(),
+                'mpesa_receipt' => $payment->mpesa_receipt,
+            ]);
         $farms = Farm::query()
             ->whereIn('id', $farmIds)
             ->when($farmId !== null, fn ($query) => $query->whereKey($farmId))
@@ -63,6 +80,7 @@ class CrmReportController extends Controller
                 'won' => (int) ($statusCounts['won'] ?? 0),
                 'conversion_rate' => $total > 0 ? round(((int) ($statusCounts['won'] ?? 0) / $total) * 100, 2) : 0,
                 'revenue_collected' => (float) $revenueCollected,
+                'payments' => $payments,
                 'by_status' => $statusCounts,
                 'subscriptions' => $farms,
                 'generated_at' => now()->toIso8601String(),
