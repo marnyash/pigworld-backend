@@ -14,6 +14,36 @@ class CrmWorkflowApiTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_crm_staff_can_filter_farm_tasks_with_customer_context(): void
+    {
+        $admin = User::factory()->create(['role' => 'farmOwner']);
+        $support = User::factory()->create(['role' => 'farmWorker', 'crm_role' => 'customer_support']);
+        $farm = Farm::create(['name' => 'Task Queue Farm']);
+        $farm->users()->attach([$admin->id, $support->id]);
+        $customer = Customer::create(['farm_id' => $farm->id, 'created_by' => $admin->id, 'name' => 'Queue Customer']);
+        CrmTask::create([
+            'farm_id' => $farm->id,
+            'customer_id' => $customer->id,
+            'created_by' => $admin->id,
+            'assigned_to' => $support->id,
+            'title' => 'High priority call',
+            'priority' => 'high',
+            'due_at' => now()->addDay(),
+        ]);
+
+        $this->actingAs($support, 'sanctum')
+            ->getJson('/api/v1/crm/tasks?farm_id='.$farm->id.'&priority=high&search=Queue')
+            ->assertOk()
+            ->assertJsonPath('data.0.title', 'High priority call')
+            ->assertJsonPath('data.0.customer.name', 'Queue Customer')
+            ->assertJsonPath('data.0.assignee.name', $support->name);
+
+        $otherFarm = Farm::create(['name' => 'Other Task Farm']);
+        $this->actingAs($support, 'sanctum')
+            ->getJson('/api/v1/crm/tasks?farm_id='.$otherFarm->id)
+            ->assertForbidden();
+    }
+
     public function test_crm_staff_can_assign_customer_create_tasks_and_read_timeline(): void
     {
         $admin = User::factory()->create(['role' => 'farmOwner']);

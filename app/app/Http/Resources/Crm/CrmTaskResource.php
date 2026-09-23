@@ -14,6 +14,12 @@ class CrmTaskResource extends JsonResource
             'id' => (string) $this->id,
             'customer_id' => (string) $this->customer_id,
             'assigned_to' => $this->assigned_to !== null ? (string) $this->assigned_to : null,
+            'customer' => $this->whenLoaded('customer', fn () => $this->customer ? [
+                'id' => (string) $this->customer->id,
+                'name' => $this->customer->name,
+                'email' => $this->customer->email,
+                'company' => $this->customer->company,
+            ] : null),
             'assignee' => $this->whenLoaded('assignee', fn () => $this->assignee ? [
                 'id' => (string) $this->assignee->id,
                 'name' => $this->assignee->name,

@@ -54,6 +54,7 @@ Route::prefix('v1')->group(function () {
         Route::patch('farms/{farm}/notifications/{notification}/read', [FarmNotificationController::class, 'markAsRead']);
 
         Route::apiResource('crm/customers', CustomerController::class);
+        Route::get('crm/tasks', [CrmTaskController::class, 'farmIndex']);
         Route::get('crm/customers/{customer}/interactions', [CustomerInteractionController::class, 'index']);
         Route::post('crm/customers/{customer}/interactions', [CustomerInteractionController::class, 'store']);
         Route::get('crm/customers/{customer}/tasks', [CrmTaskController::class, 'index']);

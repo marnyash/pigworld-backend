@@ -15,6 +15,34 @@ use Illuminate\Validation\ValidationException;
 
 class CrmTaskController extends Controller
 {
+    public function farmIndex(Request $request): JsonResponse
+    {
+        $farmId = $request->integer('farm_id');
+        $this->authorizeFarm($request, $farmId);
+
+        $tasks = CrmTask::query()
+            ->where('farm_id', $farmId)
+            ->with(['assignee:id,name,email', 'customer:id,name,email,company'])
+            ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')))
+            ->when($request->filled('assigned_to'), fn ($query) => $query->where('assigned_to', $request->integer('assigned_to')))
+            ->when($request->filled('priority'), fn ($query) => $query->where('priority', $request->string('priority')))
+            ->when($request->boolean('overdue'), fn ($query) => $query->where('status', 'open')->whereNotNull('due_at')->where('due_at', '<', now()))
+            ->when($request->filled('search'), function ($query) use ($request) {
+                $search = $request->string('search')->toString();
+                $query->where(function ($taskQuery) use ($search) {
+                    $taskQuery->where('title', 'like', "%{$search}%")
+                        ->orWhereHas('customer', fn ($customerQuery) => $customerQuery->where('name', 'like', "%{$search}%"));
+                });
+            })
+            ->orderByRaw("CASE WHEN status = 'open' THEN 0 ELSE 1 END")
+            ->orderByRaw('due_at IS NULL')
+            ->orderBy('due_at')
+            ->latest()
+            ->get();
+
+        return response()->json(['data' => CrmTaskResource::collection($tasks)]);
+    }
+
     public function index(Request $request, Customer $customer): JsonResponse
     {
         $this->authorizeCustomer($request, $customer);
@@ -88,6 +116,17 @@ class CrmTaskController extends Controller
         }
         if (! $request->user()->farms()->where('farms.id', $customer->farm_id)->exists()) {
             throw ValidationException::withMessages(['farm_id' => ['You do not have access to this farm.']]);
+        }
+    }
+
+    private function authorizeFarm(Request $request, int $farmId): void
+    {
+        $role = $request->user()->crm_role ?? ($request->user()->role === 'farmOwner' ? 'admin' : null);
+        if (! in_array($role, ['admin', 'finance', 'customer_support'], true)) {
+            abort(403, 'Only CRM staff can manage follow-up tasks.');
+        }
+        if ($farmId < 1 || ! $request->user()->farms()->whereKey($farmId)->exists()) {
+            abort(403, 'You do not have access to this farm.');
         }
     }
 

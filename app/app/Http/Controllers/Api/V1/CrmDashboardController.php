@@ -7,6 +7,7 @@ use App\Models\CrmCustomerEvent;
 use App\Models\CrmTask;
 use App\Models\Customer;
 use App\Models\CustomerInteraction;
+use App\Models\CustomerOrder;
 use App\Models\Farm;
 use App\Models\Payment;
 use Illuminate\Http\JsonResponse;
@@ -46,6 +47,14 @@ class CrmDashboardController extends Controller
             ->where('farm_id', $farmId)
             ->where('status', 'paid')
             ->sum('amount');
+        $pendingPayments = Payment::query()
+            ->where('farm_id', $farmId)
+            ->whereIn('status', ['pending', 'initiated'])
+            ->count();
+        $newOrders = CustomerOrder::query()
+            ->where('farm_id', $farmId)
+            ->where('status', 'pending')
+            ->count();
         $openTasks = CrmTask::query()
             ->where('farm_id', $farmId)
             ->where('status', 'open');
@@ -153,6 +162,12 @@ class CrmDashboardController extends Controller
                 'payment_amount' => $farm->payments()->latest()->value('amount'),
                 'payment_currency' => $farm->payments()->latest()->value('currency'),
                 'revenue_collected' => (float) $revenueCollected,
+                'pending_payments' => $pendingPayments,
+            ],
+            'alerts' => [
+                'new_messages' => $messages->count(),
+                'new_orders' => $newOrders,
+                'pending_payments' => $pendingPayments,
             ],
         ]]);
     }
