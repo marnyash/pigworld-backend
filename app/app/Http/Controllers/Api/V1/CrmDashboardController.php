@@ -8,6 +8,7 @@ use App\Models\CrmTask;
 use App\Models\Customer;
 use App\Models\CustomerInteraction;
 use App\Models\Farm;
+use App\Models\Payment;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -34,6 +35,17 @@ class CrmDashboardController extends Controller
             ->selectRaw('status, count(*) as total')
             ->groupBy('status')
             ->pluck('total', 'status');
+        $growthStart = $now->copy()->startOfMonth()->subMonths(5);
+        $customerGrowth = (clone $customers)
+            ->where('created_at', '>=', $growthStart)
+            ->selectRaw("DATE_FORMAT(created_at, '%Y-%m') as month, count(*) as total")
+            ->groupBy('month')
+            ->orderBy('month')
+            ->pluck('total', 'month');
+        $revenueCollected = Payment::query()
+            ->where('farm_id', $farmId)
+            ->where('status', 'paid')
+            ->sum('amount');
         $openTasks = CrmTask::query()
             ->where('farm_id', $farmId)
             ->where('status', 'open');
@@ -119,6 +131,11 @@ class CrmDashboardController extends Controller
                 'won' => (int) ($statusCounts['won'] ?? 0),
                 'conversion_rate' => $totalCustomers > 0 ? round(((int) ($statusCounts['won'] ?? 0) / $totalCustomers) * 100, 2) : 0,
                 'by_status' => $statusCounts,
+                'growth' => collect(range(0, 5))->map(function (int $offset) use ($growthStart, $customerGrowth): array {
+                    $month = $growthStart->copy()->addMonths($offset);
+                    $key = $month->format('Y-m');
+                    return ['label' => $month->format('M'), 'value' => (int) ($customerGrowth[$key] ?? 0)];
+                })->values(),
             ],
             'tasks' => [
                 'overdue' => (clone $openTasks)->whereNotNull('due_at')->where('due_at', '<', $now)->count(),
@@ -135,6 +152,7 @@ class CrmDashboardController extends Controller
                 'payment_status' => $farm->payments()->latest()->value('status'),
                 'payment_amount' => $farm->payments()->latest()->value('amount'),
                 'payment_currency' => $farm->payments()->latest()->value('currency'),
+                'revenue_collected' => (float) $revenueCollected,
             ],
         ]]);
     }
