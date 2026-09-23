@@ -16,6 +16,7 @@ class CrmStaffCategoryController extends Controller
         $this->authorizeStaffAccess($request);
         $farmId = $request->integer('farm_id');
         $this->authorizeFarm($request, $farmId);
+        $this->ensureDefaultCategories($farmId);
         return response()->json(['data' => StaffCategory::where('farm_id', $farmId)->where('active', true)->orderBy('name')->get()]);
     }
 
@@ -65,5 +66,12 @@ class CrmStaffCategoryController extends Controller
     private function authorizeFarm(Request $request, int $farmId): void
     {
         if (! $request->user()->farms()->whereKey($farmId)->exists()) abort(403, 'You do not have access to this farm.');
+    }
+
+    private function ensureDefaultCategories(int $farmId): void
+    {
+        foreach ([['Finance', '₿', '#286846'], ['Customer service', '✦', '#5b9c98']] as [$name, $icon, $color]) {
+            StaffCategory::firstOrCreate(['farm_id' => $farmId, 'slug' => Str::slug($name)], ['name' => $name, 'icon' => $icon, 'color' => $color, 'active' => true]);
+        }
     }
 }

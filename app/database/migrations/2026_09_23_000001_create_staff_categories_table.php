@@ -3,6 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
@@ -19,6 +20,15 @@ return new class extends Migration
             $table->timestamps();
             $table->unique(['farm_id', 'slug']);
         });
+
+        $now = now();
+        $defaults = [];
+        foreach (DB::table('farms')->pluck('id') as $farmId) {
+            foreach ([['Finance', '₿', '#286846'], ['Customer service', '✦', '#5b9c98']] as [$name, $icon, $color]) {
+                $defaults[] = ['farm_id' => $farmId, 'name' => $name, 'slug' => \Illuminate\Support\Str::slug($name), 'icon' => $icon, 'color' => $color, 'active' => true, 'created_at' => $now, 'updated_at' => $now];
+            }
+        }
+        if ($defaults) DB::table('staff_categories')->insert($defaults);
     }
 
     public function down(): void
