@@ -204,6 +204,23 @@ class CrmWorkflowApiTest extends TestCase
             ->assertJsonMissing(['name' => $worker->name]);
     }
 
+    public function test_admin_can_create_staff_category_and_non_admin_cannot(): void
+    {
+        $admin = User::factory()->create(['role' => 'farmOwner', 'crm_role' => 'admin']);
+        $support = User::factory()->create(['role' => 'farmWorker', 'crm_role' => 'customer_support']);
+        $farm = Farm::create(['name' => 'Category Farm']);
+        $farm->users()->attach([$admin->id, $support->id]);
+
+        $this->actingAs($admin, 'sanctum')
+            ->postJson('/api/v1/crm/staff-categories', ['farm_id' => $farm->id, 'name' => 'Technology', 'icon' => '*'])
+            ->assertCreated()
+            ->assertJsonPath('data.name', 'Technology');
+
+        $this->actingAs($support, 'sanctum')
+            ->postJson('/api/v1/crm/staff-categories', ['farm_id' => $farm->id, 'name' => 'Operations'])
+            ->assertForbidden();
+    }
+
     public function test_customer_orders_are_scoped_and_filterable_by_status(): void
     {
         $admin = User::factory()->create(['role' => 'farmOwner']);

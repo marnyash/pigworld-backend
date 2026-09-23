@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CustomerController;
 use App\Http\Controllers\Api\V1\CustomerInteractionController;
 use App\Http\Controllers\Api\V1\CrmTaskController;
+use App\Http\Controllers\Api\V1\CrmStaffCategoryController;
 use App\Http\Controllers\Api\V1\CrmCustomerEventController;
 use App\Http\Controllers\Api\V1\FarmMemberController;
 use App\Http\Controllers\Api\V1\FarmController;
@@ -63,6 +64,9 @@ Route::prefix('v1')->group(function () {
         Route::delete('crm/customers/{customer}/tasks/{task}', [CrmTaskController::class, 'destroy']);
         Route::get('crm/customers/{customer}/timeline', [CrmCustomerEventController::class, 'timeline']);
         Route::get('crm/members', [CrmMemberController::class, 'index']);
+        Route::get('crm/staff-categories', [CrmStaffCategoryController::class, 'index']);
+        Route::post('crm/staff-categories', [CrmStaffCategoryController::class, 'store']);
+        Route::delete('crm/staff-categories/{staffCategory}', [CrmStaffCategoryController::class, 'destroy']);
         Route::post('crm/members', [CrmMemberController::class, 'store']);
         Route::patch('crm/members/{user}', [CrmMemberController::class, 'update']);
         Route::delete('crm/members/{user}', [CrmMemberController::class, 'destroy']);
