@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Models\Farm;
+use App\Models\Payment;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -28,6 +29,11 @@ class CrmReportController extends Controller
             ->selectRaw('status, count(*) as total')
             ->groupBy('status')
             ->pluck('total', 'status');
+        $revenueCollected = Payment::query()
+            ->whereIn('farm_id', $farmIds)
+            ->when($farmId !== null, fn ($query) => $query->where('farm_id', $farmId))
+            ->where('status', 'paid')
+            ->sum('amount');
         $farms = Farm::query()
             ->whereIn('id', $farmIds)
             ->when($farmId !== null, fn ($query) => $query->whereKey($farmId))
@@ -56,6 +62,7 @@ class CrmReportController extends Controller
                 'qualified' => (int) ($statusCounts['qualified'] ?? 0),
                 'won' => (int) ($statusCounts['won'] ?? 0),
                 'conversion_rate' => $total > 0 ? round(((int) ($statusCounts['won'] ?? 0) / $total) * 100, 2) : 0,
+                'revenue_collected' => (float) $revenueCollected,
                 'by_status' => $statusCounts,
                 'subscriptions' => $farms,
                 'generated_at' => now()->toIso8601String(),
