@@ -18,7 +18,8 @@ class CrmMemberController extends Controller
         $this->canViewDirectory($request);
         $farmId = $request->integer('farm_id');
         $this->adminFarm($request, $farmId);
-        $members = User::whereHas('farms', fn ($query) => $query->where('farms.id', $farmId))
+        $members = User::whereNotNull('crm_role')
+            ->whereHas('farms', fn ($query) => $query->where('farms.id', $farmId))
             ->latest()->get();
 
         return response()->json(['data' => UserResource::collection($members)]);

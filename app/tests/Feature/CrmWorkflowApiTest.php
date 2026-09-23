@@ -185,6 +185,25 @@ class CrmWorkflowApiTest extends TestCase
             ->assertJsonCount(2, 'data.relationships.0.workers');
     }
 
+    public function test_staff_list_contains_only_crm_accounts(): void
+    {
+        $admin = User::factory()->create(['role' => 'farmOwner', 'crm_role' => 'admin']);
+        $crmStaff = User::factory()->create(['role' => 'farmWorker', 'crm_role' => 'finance']);
+        $farmOwner = User::factory()->create(['role' => 'farmOwner', 'crm_role' => null]);
+        $manager = User::factory()->create(['role' => 'farmManager', 'crm_role' => null]);
+        $worker = User::factory()->create(['role' => 'farmWorker', 'crm_role' => null]);
+        $farm = Farm::create(['name' => 'Staff Farm']);
+        $farm->users()->attach([$admin->id, $crmStaff->id, $farmOwner->id, $manager->id, $worker->id]);
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/v1/crm/members?farm_id='.$farm->id)
+            ->assertOk()
+            ->assertJsonFragment(['name' => $crmStaff->name, 'crm_role' => 'finance'])
+            ->assertJsonMissing(['name' => $farmOwner->name])
+            ->assertJsonMissing(['name' => $manager->name])
+            ->assertJsonMissing(['name' => $worker->name]);
+    }
+
     public function test_customer_orders_are_scoped_and_filterable_by_status(): void
     {
         $admin = User::factory()->create(['role' => 'farmOwner']);
