@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -36,16 +37,36 @@ class CrmDirectoryController extends Controller
                 'status' => $customer->status,
                 'open_tasks_count' => (int) $customer->open_tasks_count,
             ]);
-        $members = $farms->flatMap(fn ($farm) => $farm->users->map(fn ($member) => [
-            'id' => (string) $member->id,
-            'farm_id' => (string) $farm->id,
-            'farm_name' => $farm->name,
-            'name' => $member->name,
-            'email' => $member->email,
-            'phone' => $member->phone,
-            'role' => $member->role,
-            'status' => $member->crm_closed_at ? 'suspended' : 'active',
-        ]))->values();
+        $members = User::query()
+            ->whereIn('role', ['farmOwner', 'farmManager', 'farmWorker'])
+            ->with('farms:id,name')
+            ->orderBy('name')
+            ->get()
+            ->flatMap(function ($member): array {
+                $farms = $member->farms;
+                if ($farms->isEmpty()) {
+                    return [[
+                        'id' => (string) $member->id,
+                        'farm_id' => null,
+                        'farm_name' => 'Not assigned',
+                        'name' => $member->name,
+                        'email' => $member->email,
+                        'phone' => $member->phone,
+                        'role' => $member->role,
+                        'status' => $member->crm_closed_at ? 'suspended' : 'active',
+                    ]];
+                }
+                return $farms->map(fn ($farm): array => [
+                    'id' => (string) $member->id,
+                    'farm_id' => (string) $farm->id,
+                    'farm_name' => $farm->name,
+                    'name' => $member->name,
+                    'email' => $member->email,
+                    'phone' => $member->phone,
+                    'role' => $member->role,
+                    'status' => $member->crm_closed_at ? 'suspended' : 'active',
+                ])->all();
+            })->values();
 
         $relationships = $farms->map(function ($farm): array {
             $users = $farm->users;
