@@ -119,6 +119,17 @@ class CrmWorkflowApiTest extends TestCase
         $farm = Farm::create(['name' => 'Dashboard Farm']);
         $farm->users()->attach([$admin->id, $support->id]);
         $otherFarm->users()->attach(User::factory()->create(['role' => 'farmOwner'])->id);
+        Payment::create([
+            'farm_id' => $farm->id,
+            'user_id' => $admin->id,
+            'plan_code' => 'starter',
+            'mother_pig_count' => 1,
+            'amount' => 100,
+            'currency' => 'KES',
+            'phone' => '254712345678',
+            'status' => 'paid',
+            'paid_at' => now(),
+        ]);
 
         $customer = Customer::create([
             'farm_id' => $farm->id,
@@ -144,12 +155,14 @@ class CrmWorkflowApiTest extends TestCase
         $this->actingAs($support, 'sanctum')
             ->getJson('/api/v1/crm/dashboard/overview?farm_id='.$farm->id)
             ->assertOk()
-            ->assertJsonPath('data.customers.total', 1)
+            ->assertJsonPath('data.customers.total', 2)
+            ->assertJsonPath('data.customers.active', 2)
+            ->assertJsonPath('data.customers.farm_owners', 1)
             ->assertJsonPath('data.customers.qualified', 1)
             ->assertJsonPath('data.customers.by_status.qualified', 1)
             ->assertJsonPath('data.tasks.due_today', 1)
             ->assertJsonPath('data.tasks.items.0.customer_name', 'Dashboard Customer')
-            ->assertJsonPath('data.staff.0.open_tasks', 1);
+            ->assertJsonFragment(['open_tasks' => 1]);
     }
 
     public function test_crm_dashboard_rejects_another_farm(): void

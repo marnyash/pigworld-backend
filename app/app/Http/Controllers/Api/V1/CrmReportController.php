@@ -29,6 +29,15 @@ class CrmReportController extends Controller
             ->selectRaw('status, count(*) as total')
             ->groupBy('status')
             ->pluck('total', 'status');
+        $farms = Farm::query()
+            ->whereIn('id', $farmIds)
+            ->when($farmId !== null, fn ($query) => $query->whereKey($farmId))
+            ->with(['users' => fn ($query) => $query->where('role', 'farmOwner')])
+            ->get();
+        $farmOwnerCount = $farms->sum(fn (Farm $farm) => $farm->users->count());
+        $paidFarmOwnerCount = $farms->sum(function (Farm $farm): int {
+            return $farm->users->isNotEmpty() && $farm->payments()->latest('created_at')->value('status') === 'paid' ? $farm->users->count() : 0;
+        });
         $revenueCollected = Payment::query()
             ->whereIn('farm_id', $farmIds)
             ->when($farmId !== null, fn ($query) => $query->where('farm_id', $farmId))
@@ -51,12 +60,7 @@ class CrmReportController extends Controller
                 'paid_at' => $payment->paid_at?->toIso8601String(),
                 'mpesa_receipt' => $payment->mpesa_receipt,
             ]);
-        $farms = Farm::query()
-            ->whereIn('id', $farmIds)
-            ->when($farmId !== null, fn ($query) => $query->whereKey($farmId))
-            ->with(['users' => fn ($query) => $query->where('role', 'farmOwner')])
-            ->get()
-            ->map(function (Farm $farm): array {
+        $subscriptions = $farms->map(function (Farm $farm): array {
                 $payment = $farm->payments()->latest()->first();
 
                 return [
@@ -74,15 +78,16 @@ class CrmReportController extends Controller
 
         return response()->json([
             'data' => [
-                'total_customers' => $total,
-                'active_relationships' => $total - (int) ($statusCounts['lost'] ?? 0),
+                'total_customers' => $total + $farmOwnerCount,
+                'active_relationships' => $total - (int) ($statusCounts['lost'] ?? 0) + $paidFarmOwnerCount,
                 'qualified' => (int) ($statusCounts['qualified'] ?? 0),
                 'won' => (int) ($statusCounts['won'] ?? 0),
-                'conversion_rate' => $total > 0 ? round(((int) ($statusCounts['won'] ?? 0) / $total) * 100, 2) : 0,
+                'farm_owners' => $farmOwnerCount,
+                'conversion_rate' => ($total + $farmOwnerCount) > 0 ? round(((int) ($statusCounts['won'] ?? 0) / ($total + $farmOwnerCount)) * 100, 2) : 0,
                 'revenue_collected' => (float) $revenueCollected,
                 'payments' => $payments,
                 'by_status' => $statusCounts,
-                'subscriptions' => $farms,
+                'subscriptions' => $subscriptions,
                 'generated_at' => now()->toIso8601String(),
             ],
         ]);

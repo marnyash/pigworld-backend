@@ -13,6 +13,7 @@ use App\Models\Payment;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class CrmDashboardController extends Controller
 {
@@ -37,9 +38,12 @@ class CrmDashboardController extends Controller
             ->groupBy('status')
             ->pluck('total', 'status');
         $growthStart = $now->copy()->startOfMonth()->subMonths(5);
+        $growthMonthExpression = DB::connection()->getDriverName() === 'sqlite'
+            ? "strftime('%Y-%m', created_at)"
+            : "DATE_FORMAT(created_at, '%Y-%m')";
         $customerGrowth = (clone $customers)
             ->where('created_at', '>=', $growthStart)
-            ->selectRaw("DATE_FORMAT(created_at, '%Y-%m') as month, count(*) as total")
+            ->selectRaw("{$growthMonthExpression} as month, count(*) as total")
             ->groupBy('month')
             ->orderBy('month')
             ->pluck('total', 'month');
@@ -109,7 +113,10 @@ class CrmDashboardController extends Controller
                 'occurred_at' => $event->occurred_at?->toIso8601String(),
             ]);
 
-        $farm = Farm::query()->with(['users' => fn ($query) => $query->select('users.id', 'users.name', 'users.crm_role')])->findOrFail($farmId);
+        $farm = Farm::query()->with(['users' => fn ($query) => $query->select('users.id', 'users.name', 'users.role', 'users.crm_role')])->findOrFail($farmId);
+        $farmOwnerCount = $farm->users()->where('users.role', 'farmOwner')->count();
+        $latestFarmPayment = $farm->payments()->latest('created_at')->first();
+        $paidFarmOwnerCount = $farmOwnerCount > 0 && $latestFarmPayment?->status === 'paid' ? $farmOwnerCount : 0;
         $staff = $farm->users
             ->filter(fn ($member) => in_array($member->crm_role ?? ($member->role === 'farmOwner' ? 'admin' : null), ['admin', 'finance', 'customer_support'], true))
             ->map(function ($member) use ($farmId): array {
@@ -134,11 +141,12 @@ class CrmDashboardController extends Controller
         return response()->json(['data' => [
             'generated_at' => $now->toIso8601String(),
             'customers' => [
-                'total' => $totalCustomers,
-                'active' => $totalCustomers - (int) ($statusCounts['lost'] ?? 0),
+                'total' => $totalCustomers + $farmOwnerCount,
+                'active' => $totalCustomers - (int) ($statusCounts['lost'] ?? 0) + $paidFarmOwnerCount,
                 'qualified' => (int) ($statusCounts['qualified'] ?? 0),
                 'won' => (int) ($statusCounts['won'] ?? 0),
-                'conversion_rate' => $totalCustomers > 0 ? round(((int) ($statusCounts['won'] ?? 0) / $totalCustomers) * 100, 2) : 0,
+                'farm_owners' => $farmOwnerCount,
+                'conversion_rate' => ($totalCustomers + $farmOwnerCount) > 0 ? round(((int) ($statusCounts['won'] ?? 0) / ($totalCustomers + $farmOwnerCount)) * 100, 2) : 0,
                 'by_status' => $statusCounts,
                 'growth' => collect(range(0, 5))->map(function (int $offset) use ($growthStart, $customerGrowth): array {
                     $month = $growthStart->copy()->addMonths($offset);
