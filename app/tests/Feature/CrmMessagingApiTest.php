@@ -56,4 +56,35 @@ class CrmMessagingApiTest extends TestCase
 
         $this->assertSame(0, DB::table('crm_notifications')->count());
     }
+
+    public function test_crm_reply_is_delivered_back_to_the_app_sender(): void
+    {
+        $owner = User::factory()->create(['role' => 'farmOwner']);
+        $member = User::factory()->create(['role' => 'farmWorker']);
+        $farm = Farm::create(['name' => 'Round Trip Messaging Farm']);
+        $farm->users()->attach([$owner->id, $member->id]);
+
+        $this->actingAs($member, 'sanctum')
+            ->postJson("/api/v1/farms/{$farm->id}/notifications/messages", [
+                'message' => 'Can you confirm my delivery date?',
+            ])
+            ->assertCreated();
+
+        $this->actingAs($owner, 'sanctum')
+            ->postJson('/api/v1/crm/notifications', [
+                'farm_id' => $farm->id,
+                'recipient_id' => $member->id,
+                'message' => 'Your delivery is confirmed for Friday.',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.message', 'Your delivery is confirmed for Friday.');
+
+        $this->actingAs($member, 'sanctum')
+            ->getJson("/api/v1/farms/{$farm->id}/notifications")
+            ->assertOk()
+            ->assertJsonFragment([
+                'type' => 'crm_message',
+                'body' => 'Your delivery is confirmed for Friday.',
+            ]);
+    }
 }

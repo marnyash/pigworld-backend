@@ -27,7 +27,7 @@ class MpesaPaymentController extends Controller
         abort_if($plan->pig_limit !== null && $count > $plan->pig_limit, 422, 'This plan does not cover the farm herd size.');
         abort_if(strtoupper($plan->currency) !== 'KES', 422, 'M-Pesa payments require a KES subscription plan.');
 
-        $phone = $this->normalizeKenyanPhone($user->phone);
+        $phone = $request->normalizedPhone() ?? $this->normalizeKenyanPhone($user->phone);
         abort_unless($phone, 422, 'Use a valid Kenyan M-Pesa phone number.');
 
         $payment = Payment::create([

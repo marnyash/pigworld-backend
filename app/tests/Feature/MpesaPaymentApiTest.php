@@ -81,6 +81,40 @@ class MpesaPaymentApiTest extends TestCase
             && $request['PhoneNumber'] === '254712345678');
     }
 
+    public function test_payment_uses_the_app_supplied_phone_number_when_present(): void
+    {
+        Http::fake([
+            'sandbox.safaricom.co.ke/oauth/*' => Http::response(['access_token' => 'access-token']),
+            'sandbox.safaricom.co.ke/mpesa/*' => Http::response([
+                'ResponseCode' => '0', 'MerchantRequestID' => 'merchant-3',
+                'CheckoutRequestID' => 'checkout-3',
+                'CustomerMessage' => 'Prompt sent to 0746933820.',
+            ]),
+        ]);
+        $user = User::factory()->create(['role' => 'farmOwner', 'phone' => '254700000000']);
+        $farm = Farm::create(['name' => 'Prompt Farm', 'mother_pig_count' => 6]);
+        $user->farms()->attach($farm);
+        SubscriptionPlan::create([
+            'code' => 'starter', 'name' => 'Starter', 'amount' => 500,
+            'currency' => 'KES', 'pig_limit' => 50, 'active' => true,
+        ]);
+        config(['services.mpesa' => [
+            'environment' => 'sandbox', 'consumer_key' => 'key', 'consumer_secret' => 'secret',
+            'shortcode' => '174379', 'passkey' => 'passkey',
+            'callback_url' => 'https://payments.example.com/api/v1/payments/mpesa/callback',
+        ]]);
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson("/api/v1/farms/{$farm->id}/subscription/payment", [
+                'plan' => 'starter',
+                'phone' => '0746933820',
+            ])
+            ->assertCreated();
+
+        Http::assertSent(fn ($request) => $request->url() === 'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest'
+            && $request['PhoneNumber'] === '254746933820');
+    }
+
     public function test_successful_callback_activates_the_plan_and_is_idempotent(): void
     {
         $user = User::factory()->create(['role' => 'farmOwner', 'phone' => '254712345678']);
