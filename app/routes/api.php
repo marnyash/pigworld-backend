@@ -26,6 +26,7 @@ use App\Http\Controllers\Api\V1\MpesaPaymentController;
 use App\Http\Controllers\Api\V1\GrowthController;
 use App\Http\Controllers\Api\V1\InventoryController;
 use App\Http\Controllers\Api\V1\PregnancyController;
+use App\Http\Controllers\Api\V1\ReportsController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -114,6 +115,7 @@ Route::prefix('v1')->group(function () {
         Route::delete('farms/{farm}/growth-records/{growthRecord}', [GrowthController::class, 'destroy']);
         Route::get('farms/{farm}/growth-overview', [GrowthController::class, 'getOverview']);
         Route::get('farms/{farm}/growth-analytics', [GrowthController::class, 'getAnalytics']);
+        Route::get('farms/{farm}/reports/metrics', [ReportsController::class, 'metrics']);
 
         // Inventory Routes
         Route::get('farms/{farm}/inventory/items', [InventoryController::class, 'index']);
