@@ -30,7 +30,7 @@ class MpesaService
 
         $this->validateCallbackUrl($callbackUrl);
 
-        $accessToken = Http::asForm()->acceptJson()->timeout(15)->connectTimeout(5)
+        $accessToken = Http::asForm()->acceptJson()->timeout(30)->connectTimeout(15)
             ->withBasicAuth($key, $secret)
             ->get($baseUrl.'/oauth/v1/generate?grant_type=client_credentials')
             ->throw()->json('access_token');
@@ -39,7 +39,7 @@ class MpesaService
         }
         $timestamp = now()->format('YmdHis');
 
-        $response = Http::acceptJson()->timeout(15)->connectTimeout(5)
+        $response = Http::acceptJson()->timeout(30)->connectTimeout(15)
             ->withToken($accessToken)->post($baseUrl.'/mpesa/stkpush/v1/processrequest', [
                 'BusinessShortCode' => $shortcode,
                 'Password' => base64_encode($shortcode.$passkey.$timestamp),

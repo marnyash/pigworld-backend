@@ -19,7 +19,6 @@ class MpesaPaymentController extends Controller
     {
         $user = $request->user();
         abort_unless($user->farms()->whereKey($farm->id)->exists(), 403, 'You do not belong to this farm.');
-        abort_if(blank($user->phone), 422, 'A phone number is required for M-Pesa payment.');
 
         $count = (int) ($farm->mother_pig_count ?? 0);
         $plan = SubscriptionPlan::query()->where('code', $request->string('plan'))->where('active', true)->firstOrFail();
