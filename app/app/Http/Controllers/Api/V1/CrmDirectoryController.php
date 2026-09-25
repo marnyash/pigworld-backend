@@ -15,7 +15,11 @@ class CrmDirectoryController extends Controller
         $this->authorizeCrmAccess($request);
         $farmIds = $request->user()->farms()->pluck('farms.id');
         $farms = $request->user()->farms()
-            ->with(['users' => fn ($query) => $query->select('users.id', 'users.name', 'users.email', 'users.phone', 'users.role', 'users.crm_closed_at')])
+            ->with([
+                'users' => fn ($query) => $query->select('users.id', 'users.name', 'users.email', 'users.phone', 'users.role', 'users.crm_closed_at'),
+                'payments' => fn ($query) => $query->latest('created_at'),
+                'animals:id,farm_id,type,sex,status,birth_date',
+            ])
             ->orderBy('name')
             ->get();
 
@@ -68,6 +72,37 @@ class CrmDirectoryController extends Controller
                 ])->all();
             })->values();
 
+        $farmOwners = $farms->flatMap(function ($farm): array {
+            $owner = $farm->users->firstWhere('role', 'farmOwner');
+            if ($owner === null) return [];
+
+            $animals = $farm->animals;
+            $piglets = $this->pigletCount($farm, $animals);
+            $motherPigs = (int) ($farm->mother_pig_count ?? 0);
+            if ($motherPigs === 0) {
+                $motherPigs = $animals->filter(fn ($animal) => in_array(strtolower((string) $animal->type), ['sow', 'mother_pig', 'mother pig'], true))->count();
+            }
+            $numberOfPigs = $animals->count() ?: $motherPigs + $piglets;
+            $latestPayment = $farm->payments->first();
+            $paymentStatus = $latestPayment?->status ?? 'pending';
+
+            return [[
+                'id' => (string) $owner->id,
+                'farm_id' => (string) $farm->id,
+                'farm_name' => $farm->name,
+                'name' => $owner->name,
+                'email' => $owner->email,
+                'phone' => $owner->phone,
+                'role' => $owner->role,
+                'status' => $paymentStatus === 'paid' ? 'active' : 'pending',
+                'payment_status' => $paymentStatus,
+                'number_of_pigs' => $numberOfPigs,
+                'mother_pigs' => $motherPigs,
+                'piglets' => $piglets,
+                'piglet_age_groups' => $this->pigletAgeGroups($farm, $animals),
+            ]];
+        })->values();
+
         $relationships = $farms->map(function ($farm): array {
             $users = $farm->users;
             return [
@@ -82,7 +117,7 @@ class CrmDirectoryController extends Controller
 
         return response()->json(['data' => [
             'customers' => $customers,
-            'farm_owners' => $members->where('role', 'farmOwner')->values(),
+            'farm_owners' => $farmOwners,
             'farm_managers' => $members->where('role', 'farmManager')->values(),
             'farm_workers' => $members->where('role', 'farmWorker')->values(),
             'relationships' => $relationships,
@@ -101,6 +136,30 @@ class CrmDirectoryController extends Controller
             'phone' => $member->phone,
             'role' => $member->role,
         ];
+    }
+
+    private function pigletCount($farm, $animals): int
+    {
+        $animalPiglets = $animals->filter(fn ($animal) => in_array(strtolower((string) $animal->type), ['piglet', 'piglet_group'], true))->count();
+        if ($animalPiglets > 0) return $animalPiglets;
+
+        return collect($farm->piglet_groups ?? [])->sum(fn ($group) => (int) ($group['count'] ?? 0));
+    }
+
+    private function pigletAgeGroups($farm, $animals): array
+    {
+        $storedGroups = collect($farm->piglet_groups ?? [])
+            ->map(fn ($group): array => [
+                'count' => (int) ($group['count'] ?? 0),
+                'age_months' => (int) ($group['age_months'] ?? 0),
+            ])->values()->all();
+        if ($storedGroups !== []) return $storedGroups;
+
+        return $animals
+            ->filter(fn ($animal) => in_array(strtolower((string) $animal->type), ['piglet', 'piglet_group'], true) && $animal->birth_date)
+            ->groupBy(fn ($animal) => $animal->birth_date->diffInMonths(now()))
+            ->map(fn ($group, $age): array => ['count' => $group->count(), 'age_months' => (int) $age])
+            ->values()->all();
     }
 
     private function authorizeCrmAccess(Request $request): void

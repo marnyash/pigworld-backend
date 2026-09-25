@@ -6,6 +6,8 @@ use App\Models\Customer;
 use App\Models\CrmTask;
 use App\Models\Farm;
 use App\Models\CustomerOrder;
+use App\Models\Animal;
+use App\Models\Payment;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -183,6 +185,39 @@ class CrmWorkflowApiTest extends TestCase
             ->assertJsonPath('data.relationships.0.owner.name', $owner->name)
             ->assertJsonCount(1, 'data.relationships.0.managers')
             ->assertJsonCount(2, 'data.relationships.0.workers');
+    }
+
+    public function test_farm_owner_directory_reports_payment_status_and_herd_details(): void
+    {
+        $support = User::factory()->create(['role' => 'farmWorker', 'crm_role' => 'customer_support']);
+        $owner = User::factory()->create(['role' => 'farmOwner']);
+        $farm = Farm::create([
+            'name' => 'Paid Directory Farm',
+            'mother_pig_count' => 4,
+            'piglet_groups' => [['count' => 6, 'age_months' => 3]],
+        ]);
+        $farm->users()->attach([$support->id, $owner->id]);
+        Payment::create([
+            'farm_id' => $farm->id,
+            'user_id' => $owner->id,
+            'plan_code' => 'starter',
+            'mother_pig_count' => 4,
+            'amount' => 100,
+            'currency' => 'KES',
+            'phone' => '254712345678',
+            'status' => 'paid',
+            'paid_at' => now(),
+        ]);
+
+        $this->actingAs($support, 'sanctum')
+            ->getJson('/api/v1/crm/directories/overview')
+            ->assertOk()
+            ->assertJsonPath('data.farm_owners.0.status', 'active')
+            ->assertJsonPath('data.farm_owners.0.payment_status', 'paid')
+            ->assertJsonPath('data.farm_owners.0.number_of_pigs', 10)
+            ->assertJsonPath('data.farm_owners.0.mother_pigs', 4)
+            ->assertJsonPath('data.farm_owners.0.piglets', 6)
+            ->assertJsonPath('data.farm_owners.0.piglet_age_groups.0.age_months', 3);
     }
 
     public function test_staff_list_contains_only_crm_accounts(): void
