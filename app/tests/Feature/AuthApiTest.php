@@ -5,7 +5,9 @@ namespace Tests\Feature;
 use App\Models\Farm;
 use App\Models\RefreshToken;
 use App\Models\User;
+use App\Notifications\LoginOtpNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
 class AuthApiTest extends TestCase
@@ -29,17 +31,63 @@ class AuthApiTest extends TestCase
             ->assertJsonPath('user.role', 'farmOwner')
             ->assertJsonPath('farms.0.name', 'Green Valley Farm');
 
-        $login = $this->postJson('/api/v1/auth/login', [
-            'identifier' => '+15551234567',
-            'password' => 'password123',
-        ]);
-
-        $login->assertOk()->assertJsonStructure([
+        Notification::fake();
+        $login = $this->beginOtpLogin('+15551234567', 'password123');
+        $this->assertDatabaseHas('login_otps', ['user_id' => $registration->json('user.id')]);
+        $verified = $this->verifyOtpLogin($login, User::findOrFail($registration->json('user.id')));
+        $verified->assertOk()->assertJsonStructure([
             'access_token',
             'refresh_token',
             'user' => ['id', 'phone', 'role'],
             'farms',
         ]);
+    }
+
+    public function test_farm_owner_can_register_another_farm_using_the_existing_account(): void
+    {
+        $payload = [
+            'name' => 'Owner',
+            'email' => 'owner@example.com',
+            'phone' => '+15551234567',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+            'role' => 'farmOwner',
+            'farm_name' => 'First Farm',
+        ];
+
+        $this->postJson('/api/v1/auth/register', $payload)->assertOk();
+        $this->postJson('/api/v1/auth/register', [...$payload, 'farm_name' => 'Second Farm'])
+            ->assertOk()
+            ->assertJsonCount(2, 'farms')
+            ->assertJsonFragment(['name' => 'Second Farm']);
+
+        $this->assertDatabaseCount('users', 1);
+        $this->assertDatabaseCount('farms', 2);
+    }
+
+    public function test_existing_identity_requires_the_same_password_when_adding_a_farm(): void
+    {
+        $this->postJson('/api/v1/auth/register', [
+            'name' => 'Owner',
+            'email' => 'owner@example.com',
+            'phone' => '+15551234567',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+            'role' => 'farmOwner',
+            'farm_name' => 'First Farm',
+        ])->assertOk();
+
+        $this->postJson('/api/v1/auth/register', [
+            'name' => 'Owner',
+            'email' => 'owner@example.com',
+            'phone' => '+15551234567',
+            'password' => 'incorrect123',
+            'password_confirmation' => 'incorrect123',
+            'role' => 'farmOwner',
+            'farm_name' => 'Second Farm',
+        ])->assertUnprocessable()->assertJsonValidationErrors('password');
+
+        $this->assertDatabaseCount('farms', 1);
     }
 
     public function test_login_rejects_invalid_credentials_and_closed_crm_accounts(): void
@@ -70,10 +118,11 @@ class AuthApiTest extends TestCase
         ]);
         $farm = Farm::create(['name' => 'Test Farm']);
         $user->farms()->attach($farm);
-        $login = $this->postJson('/api/v1/auth/login', [
-            'identifier' => $user->email,
-            'password' => 'password',
-        ])->assertOk();
+        Notification::fake();
+        $challenge = $this->beginOtpLogin($user->email, 'password');
+        $login = $this->verifyOtpLogin($challenge, $user)->assertOk();
+        $refresh = RefreshToken::where('user_id', $user->id)->latest('id')->firstOrFail();
+        $this->assertTrue($refresh->remember_me);
         $token = $login->json('access_token');
         $refreshToken = $login->json('refresh_token');
 
@@ -88,6 +137,31 @@ class AuthApiTest extends TestCase
             'refresh_token' => $refreshToken,
         ])->assertUnprocessable()->assertJsonValidationErrors('refresh_token');
         $this->assertSame(0, RefreshToken::where('user_id', $user->id)->whereNull('revoked_at')->count());
+    }
+
+    public function test_non_remembered_login_uses_short_refresh_token_and_refresh_preserves_policy(): void
+    {
+        Notification::fake();
+        $user = User::factory()->create(['password' => bcrypt('password123')]);
+        $challenge = $this->postJson('/api/v1/auth/login', [
+            'identifier' => $user->email,
+            'password' => 'password123',
+            'remember_me' => false,
+        ])->assertOk();
+        $login = $this->postJson('/api/v1/auth/verify-otp', [
+            'challenge_id' => $challenge->json('challenge_id'),
+            'code' => $this->otpCode($user),
+        ])->assertOk();
+
+        $refresh = RefreshToken::where('user_id', $user->id)->latest('id')->firstOrFail();
+        $this->assertFalse($refresh->remember_me);
+        $this->assertTrue($refresh->expires_at->isBefore(now()->addHours(2)));
+
+        $refreshed = $this->postJson('/api/v1/auth/refresh', [
+            'refresh_token' => $login->json('refresh_token'),
+        ])->assertOk();
+        $this->assertFalse(RefreshToken::where('user_id', $user->id)->latest('id')->firstOrFail()->remember_me);
+        $this->assertNotSame($login->json('refresh_token'), $refreshed->json('refresh_token'));
     }
 
     public function test_user_can_lookup_legacy_farm_members_collection(): void
@@ -109,10 +183,10 @@ class AuthApiTest extends TestCase
     {
         $this->seed();
 
-        $this->postJson('/api/v1/auth/login', [
-            'identifier' => 'test@example.com',
-            'password' => 'password',
-        ])->assertOk()->assertJsonPath('user.email', 'test@example.com');
+        Notification::fake();
+        $challenge = $this->beginOtpLogin('test@example.com', 'password');
+        $this->verifyOtpLogin($challenge, User::where('email', 'test@example.com')->firstOrFail())
+            ->assertOk()->assertJsonPath('user.email', 'test@example.com');
     }
 
     public function test_production_seed_removes_the_predictable_tester_account(): void
@@ -123,5 +197,55 @@ class AuthApiTest extends TestCase
         $this->seed();
 
         $this->assertDatabaseMissing('users', ['email' => 'test@example.com']);
+    }
+
+    public function test_login_otp_is_single_use_and_rejects_incorrect_codes(): void
+    {
+        Notification::fake();
+        $user = User::factory()->create(['password' => bcrypt('password123')]);
+        $challenge = $this->beginOtpLogin($user->email, 'password123');
+        $code = $this->otpCode($user);
+
+        $this->postJson('/api/v1/auth/verify-otp', [
+            'challenge_id' => $challenge->json('challenge_id'),
+            'code' => '000000',
+        ])->assertUnprocessable()->assertJsonValidationErrors('code');
+
+        $this->postJson('/api/v1/auth/verify-otp', [
+            'challenge_id' => $challenge->json('challenge_id'),
+            'code' => $code,
+        ])->assertOk();
+        $this->postJson('/api/v1/auth/verify-otp', [
+            'challenge_id' => $challenge->json('challenge_id'),
+            'code' => $code,
+        ])->assertUnprocessable()->assertJsonValidationErrors('code');
+    }
+
+    private function beginOtpLogin(string $identifier, string $password): \Illuminate\Testing\TestResponse
+    {
+        return $this->postJson('/api/v1/auth/login', [
+            'identifier' => $identifier,
+            'password' => $password,
+            'remember_me' => true,
+        ])->assertOk()->assertJsonPath('otp_required', true);
+    }
+
+    private function verifyOtpLogin(\Illuminate\Testing\TestResponse $challenge, User $user): \Illuminate\Testing\TestResponse
+    {
+        return $this->postJson('/api/v1/auth/verify-otp', [
+            'challenge_id' => $challenge->json('challenge_id'),
+            'code' => $this->otpCode($user),
+        ]);
+    }
+
+    private function otpCode(User $user): string
+    {
+        $code = null;
+        Notification::assertSentTo($user, LoginOtpNotification::class, function (LoginOtpNotification $notification) use (&$code, $user): bool {
+            $code = $notification->toMail($user)->introLines[1] ?? null;
+            return is_string($code) && preg_match('/^\d{6}$/', $code) === 1;
+        });
+
+        return $code;
     }
 }

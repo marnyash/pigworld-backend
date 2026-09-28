@@ -10,13 +10,14 @@ class RefreshToken extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['user_id', 'token_hash', 'expires_at', 'revoked_at'];
+    protected $fillable = ['user_id', 'token_hash', 'remember_me', 'expires_at', 'revoked_at'];
 
     protected function casts(): array
     {
         return [
             'expires_at' => 'datetime',
             'revoked_at' => 'datetime',
+            'remember_me' => 'boolean',
         ];
     }
 

@@ -10,10 +10,11 @@ use Illuminate\Support\Str;
 class TokenIssuer
 {
     private const ACCESS_TOKEN_TTL_MINUTES = 15;
-    private const REFRESH_TOKEN_TTL_DAYS = 30;
+    private const REMEMBERED_REFRESH_TOKEN_TTL_DAYS = 30;
+    private const STANDARD_REFRESH_TOKEN_TTL_MINUTES = 60;
 
     /** @return array{access_token: string, refresh_token: string} */
-    public function issue(User $user): array
+    public function issue(User $user, bool $rememberMe = false): array
     {
         $accessToken = $user->createToken(
             'mobile',
@@ -24,7 +25,10 @@ class TokenIssuer
         $refreshToken = Str::random(64);
         $user->refreshTokens()->create([
             'token_hash' => hash('sha256', $refreshToken),
-            'expires_at' => now()->addDays(self::REFRESH_TOKEN_TTL_DAYS),
+            'remember_me' => $rememberMe,
+            'expires_at' => $rememberMe
+                ? now()->addDays(self::REMEMBERED_REFRESH_TOKEN_TTL_DAYS)
+                : now()->addMinutes(self::STANDARD_REFRESH_TOKEN_TTL_MINUTES),
         ]);
 
         return ['access_token' => $accessToken, 'refresh_token' => $refreshToken];

@@ -33,6 +33,7 @@ Route::prefix('v1')->group(function () {
     Route::middleware('throttle:auth')->group(function () {
         Route::post('/auth/register', [AuthController::class, 'register']);
         Route::post('/auth/login', [AuthController::class, 'login']);
+        Route::post('/auth/verify-otp', [AuthController::class, 'verifyLoginOtp']);
         Route::post('/auth/google', [AuthController::class, 'loginWithGoogle']);
         Route::post('/auth/refresh', [AuthController::class, 'refresh']);
         Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword']);

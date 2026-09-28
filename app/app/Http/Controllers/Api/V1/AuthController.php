@@ -7,18 +7,25 @@ use App\Http\Requests\Auth\ForgotPasswordRequest;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\RefreshTokenRequest;
 use App\Http\Requests\Auth\RegisterRequest;
+use App\Http\Requests\Auth\VerifyLoginOtpRequest;
 use App\Http\Resources\FarmResource;
 use App\Http\Resources\UserResource;
 use App\Models\Farm;
+use App\Models\LoginOtp;
 use App\Models\User;
+use App\Notifications\LoginOtpNotification;
 use App\Services\Auth\TokenIssuer;
 use App\Services\Auth\FirebaseIdTokenVerifier;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Laravel\Sanctum\PersonalAccessToken;
+use Throwable;
 
 class AuthController extends Controller
 {
@@ -32,30 +39,56 @@ class AuthController extends Controller
     public function register(RegisterRequest $request): JsonResponse
     {
         $role = $request->string('role')->toString();
+        $data = $request->validated();
 
-        $farm = $role === 'farmOwner'
-            ? Farm::create($request->safe()->only([
-                'mother_pig_count',
-                'piglet_groups',
-                'pregnant_pig_count',
-            ]) + ['name' => $request->string('farm_name')->toString()])
-            : ($request->filled('invite_code')
-                ? Farm::where('invite_code', $request->string('invite_code')->toString())->firstOrFail()
-                : null);
+        [$user] = DB::transaction(function () use ($data, $role): array {
+            $matches = User::query()
+                ->where('email', $data['email'])
+                ->orWhere('phone', $data['phone'])
+                ->lockForUpdate()
+                ->get();
 
-        $user = User::create([
-            'name' => $request->string('name'),
-            'email' => $request->string('email'),
-            'phone' => $request->string('phone'),
-            'password' => Hash::make($request->string('password')),
-            'role' => $role,
-        ]);
+            if ($matches->count() > 1 || ($matches->isNotEmpty() && $role !== 'farmOwner')) {
+                throw ValidationException::withMessages([
+                    'email' => ['This email or phone number is already linked to an account.'],
+                ]);
+            }
 
-        if ($farm !== null) {
-            $user->farms()->attach($farm->id);
-        }
+            $user = $matches->first();
+            if ($user !== null) {
+                if (! Hash::check($data['password'], $user->password)) {
+                    throw ValidationException::withMessages([
+                        'password' => ['Enter the existing account password to add another farm.'],
+                    ]);
+                }
+            } else {
+                $user = User::create([
+                    'name' => $data['name'],
+                    'email' => $data['email'],
+                    'phone' => $data['phone'],
+                    'password' => Hash::make($data['password']),
+                    'role' => $role,
+                ]);
+            }
 
-        return $this->authResponse($user);
+            $farm = $role === 'farmOwner'
+                ? Farm::create([
+                    'name' => $data['farm_name'],
+                    'mother_pig_count' => $data['mother_pig_count'] ?? 0,
+                    'pregnant_pig_count' => $data['pregnant_pig_count'] ?? 0,
+                ])
+                : (isset($data['invite_code'])
+                    ? Farm::where('invite_code', $data['invite_code'])->firstOrFail()
+                    : null);
+
+            if ($farm !== null && ! $user->farms()->whereKey($farm->id)->exists()) {
+                $user->farms()->attach($farm->id);
+            }
+
+            return [$user];
+        });
+
+        return $this->authResponse($user->fresh());
     }
 
     public function login(LoginRequest $request): JsonResponse
@@ -70,7 +103,71 @@ class AuthController extends Controller
             throw ValidationException::withMessages(['identifier' => ['These credentials do not match our records.']]);
         }
 
-        return $this->authResponse($user);
+        $code = (string) random_int(100000, 999999);
+        $challengeId = (string) Str::uuid();
+
+        LoginOtp::query()->where('user_id', $user->id)->delete();
+        LoginOtp::create([
+            'challenge_id' => $challengeId,
+            'user_id' => $user->id,
+            'code_hash' => Hash::make($code),
+            'remember_me' => $request->boolean('remember_me'),
+            'attempts' => 0,
+            'expires_at' => now()->addMinutes(10),
+        ]);
+
+        try {
+            Notification::send($user, new LoginOtpNotification($code));
+        } catch (Throwable $exception) {
+            LoginOtp::where('challenge_id', $challengeId)->delete();
+            report($exception);
+            throw ValidationException::withMessages([
+                'identifier' => ['Unable to send a verification code right now. Please try again.'],
+            ]);
+        }
+
+        return response()->json([
+            'otp_required' => true,
+            'challenge_id' => $challengeId,
+            'destination' => $this->maskedEmail($user->email),
+            'expires_in' => 600,
+        ]);
+    }
+
+    public function verifyLoginOtp(VerifyLoginOtpRequest $request): JsonResponse
+    {
+        $data = $request->validated();
+        [$user, $rememberMe] = DB::transaction(function () use ($data): array {
+            $challenge = LoginOtp::query()
+                ->where('challenge_id', $data['challenge_id'])
+                ->lockForUpdate()
+                ->first();
+
+            if ($challenge === null || $challenge->consumed_at !== null || $challenge->expires_at->isPast() || $challenge->attempts >= 5) {
+                return [null, false];
+            }
+
+            if (! Hash::check($data['code'], $challenge->code_hash)) {
+                $challenge->increment('attempts');
+                if ($challenge->fresh()->attempts >= 5) {
+                    $challenge->update(['consumed_at' => now()]);
+                }
+
+                return [null, false];
+            }
+
+            $challenge->update(['consumed_at' => now()]);
+
+            return [$challenge->user, $challenge->remember_me];
+        });
+
+        if ($user === null || $user->crm_closed_at !== null) {
+            throw ValidationException::withMessages([
+                'code' => ['The verification code is invalid or has expired.'],
+            ]);
+        }
+
+        return $this->authResponse($user, $rememberMe);
     }
 
     public function loginWithGoogle(Request $request): JsonResponse
@@ -101,7 +198,7 @@ class AuthController extends Controller
 
         $this->tokens->revoke($stored);
 
-        return $this->authResponse($stored->user()->firstOrFail());
+        return $this->authResponse($stored->user()->firstOrFail(), $stored->remember_me);
     }
 
     public function logout(Request $request): JsonResponse
@@ -155,14 +252,27 @@ class AuthController extends Controller
     public function forgotPassword(ForgotPasswordRequest $request): JsonResponse
     {
         // Always respond the same way to avoid revealing whether an account exists for this email.
-        Password::sendResetLink($request->only('email'));
+        $status = Password::sendResetLink($request->only('email'));
+
+        if (! in_array($status, [Password::RESET_LINK_SENT, Password::INVALID_USER], true)) {
+            throw ValidationException::withMessages([
+                'email' => [__($status)],
+            ]);
+        }
 
         return response()->json(['message' => 'If that email is registered, a reset link has been sent.']);
     }
 
-    private function authResponse(User $user): JsonResponse
+    private function maskedEmail(string $email): string
     {
-        $pair = $this->tokens->issue($user);
+        [$name, $domain] = explode('@', $email, 2);
+
+        return (strlen($name) < 2 ? '*' : substr($name, 0, 1).'***').'@'.$domain;
+    }
+
+    private function authResponse(User $user, bool $rememberMe = true): JsonResponse
+    {
+        $pair = $this->tokens->issue($user, $rememberMe);
 
         return response()->json([
             'access_token' => $pair['access_token'],
