@@ -88,6 +88,14 @@ echo ""
 # Run migrations
 echo "[7/10] Running database migrations..."
 php artisan migrate --force
+MIGRATION_STATUS=$(php artisan migrate:status --no-ansi)
+printf '%s\n' "$MIGRATION_STATUS"
+if printf '%s\n' "$MIGRATION_STATUS" | awk -F'|' '$2 ~ /No/ { pending = 1 } END { exit pending }'; then
+    echo "✓ No pending migrations"
+else
+    echo "ERROR: Pending migrations remain after deployment."
+    exit 1
+fi
 echo "✓ Migrations completed"
 echo ""
 

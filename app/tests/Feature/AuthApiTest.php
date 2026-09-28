@@ -43,6 +43,28 @@ class AuthApiTest extends TestCase
         ]);
     }
 
+    public function test_owner_can_register_with_the_mobile_onboarding_payload(): void
+    {
+        $this->postJson('/api/v1/auth/register', [
+            'name' => 'Mobile Owner',
+            'email' => 'mobile-owner@example.com',
+            'phone' => '+254712345678',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+            'role' => 'farmOwner',
+            'farm_name' => 'Mobile Farm',
+            'mother_pig_count' => 12,
+            'piglet_groups' => [
+                ['count' => 8, 'age_months' => 3],
+            ],
+            'pregnant_pig_count' => 4,
+        ])->assertOk()
+            ->assertJsonPath('user.phone', '+254712345678')
+            ->assertJsonPath('farms.0.name', 'Mobile Farm')
+            ->assertJsonPath('farms.0.mother_pig_count', 12)
+            ->assertJsonPath('farms.0.pregnant_pig_count', 4);
+    }
+
     public function test_farm_owner_can_register_another_farm_using_the_existing_account(): void
     {
         $payload = [

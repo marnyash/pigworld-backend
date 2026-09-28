@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\V1\HealthController;
 use App\Http\Controllers\Api\V1\HerdController;
 use App\Http\Controllers\Api\V1\CrmMemberController;
 use App\Http\Controllers\Api\V1\CrmNotificationController;
+use App\Http\Controllers\Api\V1\CrmSupportConversationController;
 use App\Http\Controllers\Api\V1\CrmReportController;
 use App\Http\Controllers\Api\V1\CrmDashboardController;
 use App\Http\Controllers\Api\V1\CrmDirectoryController;
@@ -22,6 +23,7 @@ use App\Http\Controllers\Api\V1\SubscriptionPlanController;
 use App\Http\Controllers\Api\V1\FeedController;
 use App\Http\Controllers\Api\V1\FarmOverviewController;
 use App\Http\Controllers\Api\V1\FarmNotificationController;
+use App\Http\Controllers\Api\V1\FarmSupportConversationController;
 use App\Http\Controllers\Api\V1\MpesaPaymentController;
 use App\Http\Controllers\Api\V1\GrowthController;
 use App\Http\Controllers\Api\V1\InventoryController;
@@ -55,6 +57,9 @@ Route::prefix('v1')->group(function () {
         Route::get('farms/{farm}/notifications', [FarmNotificationController::class, 'index']);
         Route::post('farms/{farm}/notifications/messages', [FarmNotificationController::class, 'sendMessage']);
         Route::patch('farms/{farm}/notifications/{notification}/read', [FarmNotificationController::class, 'markAsRead']);
+        Route::get('farms/{farm}/support-conversation', [FarmSupportConversationController::class, 'show']);
+        Route::post('farms/{farm}/support-conversation/messages', [FarmSupportConversationController::class, 'storeMessage']);
+        Route::patch('farms/{farm}/support-conversation/read', [FarmSupportConversationController::class, 'markAsRead']);
 
         Route::apiResource('crm/customers', CustomerController::class);
         Route::get('crm/tasks', [CrmTaskController::class, 'farmIndex']);
@@ -74,6 +79,12 @@ Route::prefix('v1')->group(function () {
         Route::delete('crm/members/{user}', [CrmMemberController::class, 'destroy']);
         Route::get('crm/notifications', [CrmNotificationController::class, 'index']);
         Route::post('crm/notifications', [CrmNotificationController::class, 'store']);
+        Route::get('crm/broadcasts', [CrmNotificationController::class, 'broadcasts']);
+        Route::get('crm/support-conversations', [CrmSupportConversationController::class, 'index']);
+        Route::get('crm/support-conversations/{conversation}', [CrmSupportConversationController::class, 'show']);
+        Route::post('crm/support-conversations/{conversation}/messages', [CrmSupportConversationController::class, 'storeMessage']);
+        Route::patch('crm/support-conversations/{conversation}', [CrmSupportConversationController::class, 'update']);
+        Route::patch('crm/support-conversations/{conversation}/read', [CrmSupportConversationController::class, 'markAsRead']);
         Route::get('crm/dashboard/overview', [CrmDashboardController::class, 'overview']);
         Route::get('crm/directories/overview', [CrmDirectoryController::class, 'overview']);
         Route::get('crm/orders', [CustomerOrderController::class, 'index']);

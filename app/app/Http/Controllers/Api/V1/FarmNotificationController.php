@@ -7,6 +7,7 @@ use App\Http\Requests\Farm\StoreFarmMessageRequest;
 use App\Http\Resources\FarmNotificationResource;
 use App\Models\Farm;
 use App\Models\FarmNotification;
+use App\Models\SupportConversation;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -43,28 +44,56 @@ class FarmNotificationController extends Controller
     public function sendMessage(StoreFarmMessageRequest $request, Farm $farm): JsonResponse
     {
         $this->authorizeMember($request, $farm);
+        abort_unless(
+            in_array($request->user()->role, ['farmOwner', 'farmManager', 'farmWorker'], true)
+                && ($request->user()->crm_role === null || $request->user()->role === 'farmOwner'),
+            403,
+            'Only farm app members can message customer support.',
+        );
 
         $message = trim($request->string('message')->toString());
-        $id = DB::table('crm_notifications')->insertGetId([
-            'farm_id' => $farm->id,
-            'sender_id' => $request->user()->id,
-            'recipient_id' => null,
-            'message' => $message,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        $notification = DB::transaction(function () use ($farm, $request, $message): FarmNotification {
+            $conversation = SupportConversation::query()
+                ->where('farm_id', $farm->id)
+                ->where('app_user_id', $request->user()->id)
+                ->lockForUpdate()
+                ->first();
 
-        $notification = FarmNotification::create([
-            'farm_id' => $farm->id,
-            'recipient_id' => $request->user()->id,
-            'type' => 'crm_message_sent',
-            'title' => 'Message sent to Pig World CRM',
-            'body' => $message,
-            'severity' => 'success',
-            'related_type' => 'crm_notification',
-            'related_id' => $id,
-            'action_route' => '/notifications',
-        ]);
+            if ($conversation === null) {
+                $conversation = SupportConversation::create([
+                    'farm_id' => $farm->id,
+                    'app_user_id' => $request->user()->id,
+                    'status' => 'open',
+                ]);
+            }
+            $conversation->messages()->create([
+                'sender_id' => $request->user()->id,
+                'sender_role' => 'app',
+                'body' => $message,
+            ]);
+            $conversation->update(['status' => 'open', 'last_message_at' => now()]);
+
+            $legacyMessageId = DB::table('crm_notifications')->insertGetId([
+                'farm_id' => $farm->id,
+                'sender_id' => $request->user()->id,
+                'recipient_id' => null,
+                'message' => $message,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            return FarmNotification::create([
+                'farm_id' => $farm->id,
+                'recipient_id' => $request->user()->id,
+                'type' => 'crm_message_sent',
+                'title' => 'Message sent to Pig World CRM',
+                'body' => $message,
+                'severity' => 'success',
+                'related_type' => 'crm_notification',
+                'related_id' => $legacyMessageId,
+                'action_route' => '/notifications',
+            ]);
+        });
 
         return response()->json(['data' => new FarmNotificationResource($notification)], 201);
     }

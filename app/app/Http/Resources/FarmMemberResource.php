@@ -15,6 +15,7 @@ class FarmMemberResource extends JsonResource
             'name' => $this->name,
             'email' => $this->email,
             'role' => $this->role,
+            'crm_role' => $this->crm_role,
             // Null means the member uses the default permission set for their role.
             'permissions' => $this->pivot?->permissions === null ? null : json_decode($this->pivot->permissions, true),
         ];
