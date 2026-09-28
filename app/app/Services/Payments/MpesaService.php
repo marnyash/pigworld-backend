@@ -2,7 +2,9 @@
 
 namespace App\Services\Payments;
 
+use App\Exceptions\MpesaGatewayException;
 use App\Models\Payment;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
@@ -30,16 +32,17 @@ class MpesaService
 
         $this->validateCallbackUrl($callbackUrl);
 
-        $accessToken = Http::asForm()->acceptJson()->timeout(30)->connectTimeout(15)
+        $tokenResponse = Http::asForm()->acceptJson()->timeout(30)->connectTimeout(15)
             ->withBasicAuth($key, $secret)
-            ->get($baseUrl.'/oauth/v1/generate?grant_type=client_credentials')
-            ->throw()->json('access_token');
+            ->get($baseUrl.'/oauth/v1/generate?grant_type=client_credentials');
+        $this->throwIfProviderFailed($tokenResponse, 'OAuth');
+        $accessToken = $tokenResponse->json('access_token');
         if (! is_string($accessToken) || blank($accessToken)) {
             throw new RuntimeException('M-Pesa did not return an access token.');
         }
         $timestamp = now()->format('YmdHis');
 
-        $response = Http::acceptJson()->timeout(30)->connectTimeout(15)
+        $stkResponse = Http::acceptJson()->timeout(30)->connectTimeout(15)
             ->withToken($accessToken)->post($baseUrl.'/mpesa/stkpush/v1/processrequest', [
                 'BusinessShortCode' => $shortcode,
                 'Password' => base64_encode($shortcode.$passkey.$timestamp),
@@ -52,13 +55,50 @@ class MpesaService
                 'CallBackURL' => $callbackUrl,
                 'AccountReference' => 'Farm-'.$payment->farm_id,
                 'TransactionDesc' => 'Pig World subscription',
-            ])->throw()->json();
+            ]);
+
+        $this->throwIfProviderFailed($stkResponse, 'STK push');
+        $response = $stkResponse->json();
+        if (! is_array($response)) {
+            throw new RuntimeException('M-Pesa returned an invalid STK response.');
+        }
 
         if (($response['ResponseCode'] ?? null) !== '0') {
-            throw new RuntimeException($response['errorMessage'] ?? $response['ResponseDescription'] ?? 'M-Pesa rejected the STK push.');
+            throw new MpesaGatewayException(
+                'STK push',
+                $stkResponse->status(),
+                $this->scalar($response['errorCode'] ?? $response['ResponseCode'] ?? null),
+                $this->scalar($response['requestId'] ?? $response['RequestId'] ?? $response['MerchantRequestID'] ?? null),
+                $this->scalar($response['errorMessage'] ?? $response['ResponseDescription'] ?? null)
+                    ?? 'Safaricom rejected the STK request.',
+            );
         }
 
         return $response;
+    }
+
+    private function throwIfProviderFailed(Response $response, string $stage): void
+    {
+        if ($response->successful()) {
+            return;
+        }
+
+        $body = $response->json();
+        $body = is_array($body) ? $body : [];
+
+        throw new MpesaGatewayException(
+            $stage,
+            $response->status(),
+            $this->scalar($body['errorCode'] ?? $body['ResponseCode'] ?? null),
+            $this->scalar($body['requestId'] ?? $body['RequestId'] ?? $body['MerchantRequestID'] ?? null),
+            $this->scalar($body['errorMessage'] ?? $body['ResponseDescription'] ?? $body['message'] ?? null)
+                ?? 'Safaricom returned an unsuccessful response.',
+        );
+    }
+
+    private function scalar(mixed $value): ?string
+    {
+        return is_string($value) || is_numeric($value) ? (string) $value : null;
     }
 
     private function validateCallbackUrl(string $callbackUrl): void

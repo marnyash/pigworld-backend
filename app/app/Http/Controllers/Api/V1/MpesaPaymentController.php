@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Exceptions\MpesaGatewayException;
 use App\Http\Requests\Farm\StoreMpesaPaymentRequest;
 use App\Models\Farm;
 use App\Models\Payment;
@@ -11,6 +12,9 @@ use App\Services\Payments\MpesaService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Http\Client\ConnectionException;
+use RuntimeException;
 use Throwable;
 
 class MpesaPaymentController extends Controller
@@ -47,6 +51,49 @@ class MpesaPaymentController extends Controller
                 'checkout_request_id' => $response['CheckoutRequestID'] ?? null,
                 'result_description' => $response['CustomerMessage'] ?? null,
             ]);
+        } catch (MpesaGatewayException $exception) {
+            $payment->update(['status' => 'failed', 'result_description' => 'Unable to start M-Pesa payment.']);
+
+            Log::warning('Safaricom rejected or failed a payment initiation request.', [
+                'payment_id' => $payment->id,
+                'farm_id' => $farm->id,
+                'stage' => $exception->stage,
+                'upstream_status' => $exception->upstreamStatus,
+                'provider_code' => $exception->providerCode,
+                'provider_request_id' => $exception->requestId,
+                'provider_message' => $exception->providerMessage,
+            ]);
+
+            return response()->json([
+                'message' => 'Safaricom could not start the payment. Check that the Daraja environment, shortcode, and credentials belong to the same app.',
+                'error' => 'mpesa_upstream_error',
+                'provider_code' => $exception->providerCode,
+                'reference' => $exception->requestId,
+            ], 502);
+        } catch (ConnectionException $exception) {
+            $payment->update(['status' => 'failed', 'result_description' => 'Unable to connect to M-Pesa.']);
+            Log::warning('Could not connect to the Safaricom payment gateway.', [
+                'payment_id' => $payment->id,
+                'farm_id' => $farm->id,
+                'message' => $exception->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Could not connect to Safaricom. Please try again later.',
+                'error' => 'mpesa_connection_error',
+            ], 502);
+        } catch (RuntimeException $exception) {
+            $payment->update(['status' => 'failed', 'result_description' => 'M-Pesa payment configuration error.']);
+            Log::error('M-Pesa payment configuration or response error.', [
+                'payment_id' => $payment->id,
+                'farm_id' => $farm->id,
+                'message' => $exception->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'M-Pesa is not ready to process this payment. Please contact support.',
+                'error' => 'mpesa_configuration_error',
+            ], 503);
         } catch (Throwable $exception) {
             $payment->update(['status' => 'failed', 'result_description' => 'Unable to start M-Pesa payment.']);
             throw $exception;

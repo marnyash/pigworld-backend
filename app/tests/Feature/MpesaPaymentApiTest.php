@@ -115,6 +115,47 @@ class MpesaPaymentApiTest extends TestCase
             && $request['PhoneNumber'] === '254746933820');
     }
 
+    public function test_safaricom_server_error_is_returned_as_a_safe_gateway_error(): void
+    {
+        Http::fake([
+            'sandbox.safaricom.co.ke/oauth/*' => Http::response(['access_token' => 'access-token']),
+            'sandbox.safaricom.co.ke/mpesa/*' => Http::response([
+                'requestId' => 'safe-reference-123',
+                'errorCode' => '500.001.1001',
+                'errorMessage' => 'Internal provider error',
+            ], 500),
+        ]);
+        $user = User::factory()->create(['role' => 'farmOwner', 'phone' => '254712345678']);
+        $farm = Farm::create(['name' => 'Gateway Error Farm', 'mother_pig_count' => 5]);
+        $user->farms()->attach($farm);
+        SubscriptionPlan::create([
+            'code' => 'starter', 'name' => 'Starter', 'amount' => 500,
+            'currency' => 'KES', 'pig_limit' => 50, 'active' => true,
+        ]);
+        config(['services.mpesa' => [
+            'environment' => 'sandbox', 'consumer_key' => 'secret-key', 'consumer_secret' => 'secret-value',
+            'shortcode' => '174379', 'passkey' => 'secret-passkey',
+            'callback_url' => 'https://api.example.com/api/v1/payments/mpesa/callback',
+        ]]);
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson("/api/v1/farms/{$farm->id}/subscription/payment", [
+                'plan' => 'starter',
+                'phone' => '0746933820',
+            ])
+            ->assertStatus(502)
+            ->assertJsonPath('error', 'mpesa_upstream_error')
+            ->assertJsonPath('provider_code', '500.001.1001')
+            ->assertJsonPath('reference', 'safe-reference-123')
+            ->assertDontSee('secret-value');
+
+        $this->assertDatabaseHas('payments', [
+            'farm_id' => $farm->id,
+            'phone' => '254746933820',
+            'status' => 'failed',
+        ]);
+    }
+
     public function test_successful_callback_activates_the_plan_and_is_idempotent(): void
     {
         $user = User::factory()->create(['role' => 'farmOwner', 'phone' => '254712345678']);
