@@ -63,7 +63,7 @@ class MpesaService
             throw new RuntimeException('M-Pesa returned an invalid STK response.');
         }
 
-        if (($response['ResponseCode'] ?? null) !== '0') {
+        if ((string) ($response['ResponseCode'] ?? '') !== '0') {
             throw new MpesaGatewayException(
                 'STK push',
                 $stkResponse->status(),
@@ -72,6 +72,11 @@ class MpesaService
                 $this->scalar($response['errorMessage'] ?? $response['ResponseDescription'] ?? null)
                     ?? 'Safaricom rejected the STK request.',
             );
+        }
+
+        if (blank($response['MerchantRequestID'] ?? null) ||
+            blank($response['CheckoutRequestID'] ?? null)) {
+            throw new RuntimeException('M-Pesa accepted the request without returning request identifiers.');
         }
 
         return $response;

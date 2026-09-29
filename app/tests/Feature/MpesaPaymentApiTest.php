@@ -19,7 +19,7 @@ class MpesaPaymentApiTest extends TestCase
         Http::fake([
             'sandbox.safaricom.co.ke/oauth/*' => Http::response(['access_token' => 'access-token']),
             'sandbox.safaricom.co.ke/mpesa/*' => Http::response([
-                'ResponseCode' => '0',
+                'ResponseCode' => 0,
                 'MerchantRequestID' => 'merchant-1',
                 'CheckoutRequestID' => 'checkout-1',
                 'CustomerMessage' => 'Success. Request accepted for processing.',
@@ -113,6 +113,40 @@ class MpesaPaymentApiTest extends TestCase
 
         Http::assertSent(fn ($request) => $request->url() === 'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest'
             && $request['PhoneNumber'] === '254746933820');
+    }
+
+    public function test_successful_provider_response_without_checkout_id_is_not_reported_as_a_sent_prompt(): void
+    {
+        Http::fake([
+            'sandbox.safaricom.co.ke/oauth/*' => Http::response(['access_token' => 'access-token']),
+            'sandbox.safaricom.co.ke/mpesa/*' => Http::response([
+                'ResponseCode' => '0',
+                'MerchantRequestID' => 'merchant-without-checkout',
+            ]),
+        ]);
+        $user = User::factory()->create(['role' => 'farmOwner', 'phone' => '254712345678']);
+        $farm = Farm::create(['name' => 'Incomplete Prompt Farm', 'mother_pig_count' => 5]);
+        $user->farms()->attach($farm);
+        SubscriptionPlan::create([
+            'code' => 'starter', 'name' => 'Starter', 'amount' => 500,
+            'currency' => 'KES', 'pig_limit' => 50, 'active' => true,
+        ]);
+        config(['services.mpesa' => [
+            'environment' => 'sandbox', 'consumer_key' => 'key', 'consumer_secret' => 'secret',
+            'shortcode' => '174379', 'passkey' => 'passkey',
+            'callback_url' => 'https://payments.example.com/api/v1/payments/mpesa/callback',
+        ]]);
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson("/api/v1/farms/{$farm->id}/subscription/payment", ['plan' => 'starter'])
+            ->assertStatus(503)
+            ->assertJsonPath('error', 'mpesa_configuration_error');
+
+        $this->assertDatabaseHas('payments', [
+            'farm_id' => $farm->id,
+            'status' => 'failed',
+            'checkout_request_id' => null,
+        ]);
     }
 
     public function test_safaricom_server_error_is_returned_as_a_safe_gateway_error(): void
