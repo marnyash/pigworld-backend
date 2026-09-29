@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\CrmAuditLog;
 use App\Models\StaffCategory;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -41,6 +42,13 @@ class CrmStaffCategoryController extends Controller
             'icon' => $data['icon'] ?? '•',
             'color' => $data['color'] ?? '#286846',
         ]);
+        CrmAuditLog::create([
+            'farm_id' => $data['farm_id'],
+            'user_id' => $request->user()->id,
+            'action' => 'Created staff category: '.$category->name,
+            'module' => 'Staff categories',
+            'metadata' => ['category_id' => $category->id],
+        ]);
         return response()->json(['data' => $category], 201);
     }
 
@@ -48,6 +56,13 @@ class CrmStaffCategoryController extends Controller
     {
         $this->authorizeAdmin($request);
         $this->authorizeFarm($request, $staffCategory->farm_id);
+        CrmAuditLog::create([
+            'farm_id' => $staffCategory->farm_id,
+            'user_id' => $request->user()->id,
+            'action' => 'Deleted staff category: '.$staffCategory->name,
+            'module' => 'Staff categories',
+            'metadata' => ['category_id' => $staffCategory->id],
+        ]);
         $staffCategory->delete();
         return response()->json(null, 204);
     }

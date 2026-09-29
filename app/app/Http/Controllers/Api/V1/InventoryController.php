@@ -38,7 +38,7 @@ class InventoryController extends Controller
             ->value('total') ?? 0;
 
         return response()->json([
-            'items' => InventoryItemResource::collection($items),
+            'data' => InventoryItemResource::collection($items),
             'pagination' => [
                 'total' => $items->total(),
                 'per_page' => $items->perPage(),
@@ -83,7 +83,7 @@ class InventoryController extends Controller
         $this->authorizeItemBelongsToFarm($item, $farm);
 
         return response()->json([
-            'data' => new InventoryItemResource($item),
+            'item' => new InventoryItemResource($item),
             'movements' => StockMovementResource::collection($item->movements()->latest()->limit(20)->get()),
         ]);
     }

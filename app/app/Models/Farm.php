@@ -15,6 +15,7 @@ class Farm extends Model
     protected $fillable = [
         'name',
         'location',
+        'created_by',
         'invite_code',
         'mother_pig_count',
         'piglet_groups',
@@ -50,7 +51,12 @@ class Farm extends Model
     /** @return BelongsToMany<User, Farm> */
     public function users(): BelongsToMany
     {
-        return $this->belongsToMany(User::class)->withPivot('permissions')->withTimestamps();
+        return $this->belongsToMany(User::class)->withPivot(['permissions', 'role'])->withTimestamps();
+    }
+
+    public function createdBy(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
     }
 
     /** @return HasMany<FarmJoinRequest, Farm> */

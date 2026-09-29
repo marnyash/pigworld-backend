@@ -93,16 +93,16 @@ class CrmPolicyApiTest extends TestCase
         $farm = Farm::create(['name' => 'Audit Farm']);
         $farm->users()->attach([$support->id, $admin->id]);
 
-        $this->actingAs($support, 'sanctum')
-            ->postJson('/api/v1/crm/audit-logs', [
+        $this->actingAs($admin, 'sanctum')
+            ->postJson('/api/v1/crm/policies', [
                 'farm_id' => $farm->id,
-                'action' => 'Sent a reply',
-                'module' => 'Communication',
-                'metadata' => ['conversation_id' => 12],
+                'title' => 'Audit policy',
+                'audience' => 'all',
+                'effective_date' => '2026-10-01',
+                'summary' => 'Policy changes are recorded.',
+                'visible_pages' => ['Home'],
             ])
-            ->assertCreated()
-            ->assertJsonPath('data.staff', $support->name)
-            ->assertJsonPath('data.action', 'Sent a reply');
+            ->assertCreated();
 
         $this->actingAs($support, 'sanctum')
             ->getJson('/api/v1/crm/audit-logs?farm_id='.$farm->id)
@@ -112,9 +112,52 @@ class CrmPolicyApiTest extends TestCase
             ->getJson('/api/v1/crm/audit-logs?farm_id='.$farm->id)
             ->assertOk()
             ->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0.metadata.conversation_id', 12);
+            ->assertJsonPath('data.0.metadata.policy_id', CrmPolicy::first()->id)
+            ->assertJsonPath('data.0.staff', $admin->name)
+            ->assertJsonPath('data.0.action', 'Published staff policy: Audit policy');
 
         $this->assertSame(1, CrmAuditLog::where('farm_id', $farm->id)->count());
-        $this->assertSame(1, CrmPolicy::count() + CrmAuditLog::count());
+        $this->actingAs($support, 'sanctum')
+            ->postJson('/api/v1/crm/audit-logs', ['farm_id' => $farm->id, 'action' => 'Forged entry', 'module' => 'Staff'])
+            ->assertMethodNotAllowed();
+    }
+
+    public function test_staff_account_mutations_create_server_attributed_audit_records(): void
+    {
+        $admin = User::factory()->create(['role' => 'farmOwner', 'crm_role' => 'admin']);
+        $farm = Farm::create(['name' => 'Staff Audit Farm']);
+        $farm->users()->attach($admin->id);
+
+        $memberId = $this->actingAs($admin, 'sanctum')
+            ->postJson('/api/v1/crm/members', [
+                'farm_id' => $farm->id,
+                'name' => 'New Staff Member',
+                'email' => 'new.staff@example.com',
+                'password' => 'temporary-password',
+                'crm_role' => 'finance',
+            ])
+            ->assertCreated()
+            ->json('data.id');
+
+        $this->actingAs($admin, 'sanctum')
+            ->patchJson("/api/v1/crm/members/{$memberId}", ['crm_role' => 'customer_support'])
+            ->assertOk();
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/v1/crm/audit-logs?farm_id='.$farm->id)
+            ->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->assertJsonFragment(['action' => 'Added CRM account: New Staff Member'])
+            ->assertJsonFragment(['action' => 'Updated CRM account role: New Staff Member']);
+
+        $this->actingAs($admin, 'sanctum')
+            ->deleteJson("/api/v1/crm/members/{$memberId}")
+            ->assertNoContent();
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/v1/crm/audit-logs?farm_id='.$farm->id)
+            ->assertOk()
+            ->assertJsonCount(3, 'data')
+            ->assertJsonFragment(['action' => 'Deleted CRM account: New Staff Member']);
     }
 }

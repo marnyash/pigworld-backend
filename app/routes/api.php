@@ -80,7 +80,6 @@ Route::prefix('v1')->group(function () {
         Route::post('crm/policies', [CrmPolicyController::class, 'store']);
         Route::put('crm/policies/{policy}', [CrmPolicyController::class, 'update']);
         Route::get('crm/audit-logs', [CrmAuditLogController::class, 'index']);
-        Route::post('crm/audit-logs', [CrmAuditLogController::class, 'store']);
         Route::post('crm/members', [CrmMemberController::class, 'store']);
         Route::patch('crm/members/{user}', [CrmMemberController::class, 'update']);
         Route::delete('crm/members/{user}', [CrmMemberController::class, 'destroy']);

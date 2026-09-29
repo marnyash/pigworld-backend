@@ -25,6 +25,7 @@ class CrmSupportConversationController extends Controller
             ->where('farm_id', $data['farm_id'])
             ->when(($data['status'] ?? 'open') !== 'all', fn ($query) => $query->where('status', $data['status'] ?? 'open'))
             ->with([
+                'customer:id,name,email,phone,company,status',
                 'appUser:id,name,email,role',
                 'assignee:id,name,email,crm_role',
                 'latestMessage.sender:id,name,crm_role,role',
@@ -48,6 +49,7 @@ class CrmSupportConversationController extends Controller
     {
         $this->authorizeConversation($request, $conversation);
         $conversation->load([
+            'customer:id,name,email,phone,company,status',
             'appUser:id,name,email,role',
             'assignee:id,name,email,crm_role',
             'messages.sender:id,name,crm_role,role',
@@ -131,15 +133,19 @@ class CrmSupportConversationController extends Controller
 
     private function summaryData(SupportConversation $conversation): array
     {
+        $customer = $conversation->customer ?? $conversation->appUser;
+
         return [
             'id' => (string) $conversation->id,
             'farm_id' => (string) $conversation->farm_id,
             'status' => $conversation->status,
-            'customer' => $conversation->appUser ? [
-                'id' => (string) $conversation->appUser->id,
-                'name' => $conversation->appUser->name,
-                'email' => $conversation->appUser->email,
-                'role' => $conversation->appUser->role,
+            'customer' => $customer ? [
+                'id' => (string) $customer->id,
+                'name' => $customer->name,
+                'email' => $customer->email,
+                'phone' => $customer->phone ?? null,
+                'company' => $customer->company ?? null,
+                'role' => $customer->role ?? $customer->status ?? null,
             ] : null,
             'assigned_agent' => $conversation->assignee ? [
                 'id' => (string) $conversation->assignee->id,

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\Customer;
 use App\Models\Farm;
 use App\Models\SupportConversation;
 use App\Models\SupportMessage;
@@ -18,7 +19,8 @@ class FarmSupportConversationController extends Controller
         $conversation = SupportConversation::query()
             ->where('farm_id', $farm->id)
             ->where('app_user_id', $request->user()->id)
-            ->with(['appUser:id,name', 'assignee:id,name,crm_role', 'messages.sender:id,name,crm_role,role'])
+            ->with(['customer:id,name,email,phone,company,status', 'appUser:id,name', 'assignee:id,name,crm_role', 'messages.sender:id,name,crm_role,role'])
+            ->orderByDesc('updated_at')
             ->first();
 
         return response()->json(['data' => $conversation ? $this->conversationData($conversation) : null]);
@@ -28,13 +30,24 @@ class FarmSupportConversationController extends Controller
     {
         $this->authorizeMember($request, $farm);
         $data = $request->validate([
+            'customer_id' => ['sometimes', 'nullable', 'integer', 'exists:customers,id'],
             'message' => ['required', 'string', 'max:4000'],
         ]);
+
+        if (isset($data['customer_id'])) {
+            $customerBelongsToFarm = Customer::query()
+                ->whereKey($data['customer_id'])
+                ->where('farm_id', $farm->id)
+                ->exists();
+
+            abort_unless($customerBelongsToFarm, 422, 'The customer must belong to the selected farm.');
+        }
 
         $conversation = DB::transaction(function () use ($farm, $request, $data): SupportConversation {
             $conversation = SupportConversation::query()
                 ->where('farm_id', $farm->id)
                 ->where('app_user_id', $request->user()->id)
+                ->when(isset($data['customer_id']), fn ($query) => $query->where('customer_id', $data['customer_id']))
                 ->lockForUpdate()
                 ->first();
 
@@ -42,6 +55,7 @@ class FarmSupportConversationController extends Controller
                 $conversation = SupportConversation::create([
                     'farm_id' => $farm->id,
                     'app_user_id' => $request->user()->id,
+                    'customer_id' => $data['customer_id'] ?? null,
                     'status' => 'open',
                 ]);
             }
@@ -58,6 +72,7 @@ class FarmSupportConversationController extends Controller
 
         return response()->json([
             'data' => $this->conversationData($conversation->fresh([
+                'customer:id,name,email,phone,company,status',
                 'appUser:id,name',
                 'assignee:id,name,crm_role',
                 'messages.sender:id,name,crm_role,role',
@@ -95,10 +110,20 @@ class FarmSupportConversationController extends Controller
 
     private function conversationData(SupportConversation $conversation): array
     {
+        $customer = $conversation->customer ?? $conversation->appUser;
+
         return [
             'id' => (string) $conversation->id,
             'farm_id' => (string) $conversation->farm_id,
             'status' => $conversation->status,
+            'customer' => $customer ? [
+                'id' => (string) $customer->id,
+                'name' => $customer->name,
+                'email' => $customer->email ?? null,
+                'phone' => $customer->phone ?? null,
+                'company' => $customer->company ?? null,
+                'role' => $customer->role ?? $customer->status ?? null,
+            ] : null,
             'assigned_agent' => $conversation->assignee ? [
                 'id' => (string) $conversation->assignee->id,
                 'name' => $conversation->assignee->name,

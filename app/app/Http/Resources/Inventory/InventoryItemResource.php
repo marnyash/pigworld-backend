@@ -9,6 +9,10 @@ class InventoryItemResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $stockStatus = $this->isExpired()
+            ? 'expired'
+            : ($this->isLowStock() ? 'low_stock' : 'in_stock');
+
         return [
             'id' => $this->id,
             'farmId' => $this->farm_id,
@@ -30,6 +34,8 @@ class InventoryItemResource extends JsonResource
             'isLowStock' => $this->isLowStock(),
             'isExpired' => $this->isExpired(),
             'isExpiringSoon' => $this->isExpiringSoon(),
+            'totalValue' => $this->inventoryValue(),
+            'stockStatus' => $stockStatus,
             'inventoryValue' => $this->inventoryValue(),
         ];
     }

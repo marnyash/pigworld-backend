@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\CrmAuditLog;
 use App\Models\CrmPolicy;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,6 +18,7 @@ class CrmPolicyController extends Controller
 
         $policies = CrmPolicy::query()
             ->where('farm_id', $farmId)
+            ->with(['creator:id,name', 'updater:id,name'])
             ->latest()
             ->get()
             ->map(fn (CrmPolicy $policy): array => $this->serialize($policy));
@@ -33,6 +35,7 @@ class CrmPolicyController extends Controller
         $data['updated_by'] = $request->user()->id;
 
         $policy = CrmPolicy::create($data);
+        $this->recordAudit($policy, $request, 'Published staff policy: '.$policy->title);
 
         return response()->json(['data' => $this->serialize($policy)], 201);
     }
@@ -44,7 +47,9 @@ class CrmPolicyController extends Controller
         $data = $request->validate($this->rules(false));
         unset($data['farm_id']);
         $data['updated_by'] = $request->user()->id;
+        $wasArchived = $policy->status !== 'archived' && ($data['status'] ?? $policy->status) === 'archived';
         $policy->update($data);
+        $this->recordAudit($policy, $request, ($wasArchived ? 'Archived' : 'Updated').' staff policy: '.$policy->title);
 
         return response()->json(['data' => $this->serialize($policy->fresh())]);
     }
@@ -85,6 +90,17 @@ class CrmPolicyController extends Controller
             'created_at' => $policy->created_at?->toIso8601String(),
             'updated_at' => $policy->updated_at?->toIso8601String(),
         ];
+    }
+
+    private function recordAudit(CrmPolicy $policy, Request $request, string $action): void
+    {
+        CrmAuditLog::create([
+            'farm_id' => $policy->farm_id,
+            'user_id' => $request->user()->id,
+            'action' => $action,
+            'module' => 'Staff policies',
+            'metadata' => ['policy_id' => $policy->id],
+        ]);
     }
 
     private function authorizeAdmin(Request $request): void

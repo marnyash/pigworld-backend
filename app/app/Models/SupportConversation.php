@@ -12,6 +12,7 @@ class SupportConversation extends Model
     protected $fillable = [
         'farm_id',
         'app_user_id',
+        'customer_id',
         'assigned_user_id',
         'status',
         'last_message_at',
@@ -25,6 +26,11 @@ class SupportConversation extends Model
     public function appUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'app_user_id');
+    }
+
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(Customer::class, 'customer_id');
     }
 
     public function assignee(): BelongsTo

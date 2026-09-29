@@ -26,25 +26,6 @@ class CrmAuditLogController extends Controller
         return response()->json(['data' => $logs]);
     }
 
-    public function store(Request $request): JsonResponse
-    {
-        $this->authorizeStaff($request);
-        $data = $request->validate([
-            'farm_id' => ['required', 'integer', 'exists:farms,id'],
-            'action' => ['required', 'string', 'max:200'],
-            'module' => ['required', 'string', 'max:80'],
-            'metadata' => ['nullable', 'array'],
-        ]);
-        $this->authorizeFarm($request, (int) $data['farm_id']);
-
-        $log = CrmAuditLog::create([
-            ...$data,
-            'user_id' => $request->user()->id,
-        ])->load('user:id,name,email');
-
-        return response()->json(['data' => $this->serialize($log)], 201);
-    }
-
     private function serialize(CrmAuditLog $log): array
     {
         return [
@@ -61,14 +42,6 @@ class CrmAuditLogController extends Controller
     {
         if (($request->user()->crm_role ?? null) !== 'admin' && $request->user()->role !== 'farmOwner') {
             abort(403, 'Only CRM admins can view staff audit logs.');
-        }
-    }
-
-    private function authorizeStaff(Request $request): void
-    {
-        $role = $request->user()->crm_role ?? ($request->user()->role === 'farmOwner' ? 'admin' : null);
-        if (! in_array($role, ['admin', 'finance', 'customer_support'], true)) {
-            abort(403, 'Only CRM staff can create audit events.');
         }
     }
 

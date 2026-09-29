@@ -22,7 +22,7 @@ class User extends Authenticatable
     /** @return BelongsToMany<Farm, User> */
     public function farms(): BelongsToMany
     {
-        return $this->belongsToMany(Farm::class)->withPivot('permissions')->withTimestamps();
+        return $this->belongsToMany(Farm::class)->withPivot(['permissions', 'role'])->withTimestamps();
     }
 
     /** @return \Illuminate\Database\Eloquent\Relations\HasMany<FarmJoinRequest, User> */

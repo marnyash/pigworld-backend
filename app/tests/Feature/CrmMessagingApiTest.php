@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Customer;
 use App\Models\Farm;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -160,6 +161,53 @@ class CrmMessagingApiTest extends TestCase
             ->getJson("/api/v1/crm/support-conversations/{$conversationId}")
             ->assertOk()
             ->assertJsonPath('data.unread_count', 0);
+    }
+
+    public function test_customer_specific_support_threads_are_linked_to_the_correct_customer(): void
+    {
+        $owner = User::factory()->create(['role' => 'farmOwner']);
+        $support = User::factory()->create(['role' => 'farmWorker', 'crm_role' => 'customer_support']);
+        $member = User::factory()->create(['role' => 'farmWorker']);
+        $farm = Farm::create(['name' => 'Customer Thread Farm']);
+        $farm->users()->attach([$owner->id, $support->id, $member->id]);
+        $customer = Customer::create([
+            'farm_id' => $farm->id,
+            'created_by' => $owner->id,
+            'assigned_user_id' => $support->id,
+            'name' => 'Amina Farmer',
+            'email' => 'amina@example.com',
+            'phone' => '254700123456',
+            'company' => 'Amina Poultry',
+            'address' => 'Nairobi',
+            'type' => 'buyer',
+            'status' => 'new',
+            'notes' => 'Priority customer',
+        ]);
+
+        $this->actingAs($member, 'sanctum')
+            ->postJson("/api/v1/farms/{$farm->id}/support-conversation/messages", [
+                'customer_id' => $customer->id,
+                'message' => 'I need a quote for feed.',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.customer.id', (string) $customer->id)
+            ->assertJsonPath('data.customer.name', 'Amina Farmer');
+
+        $conversationId = DB::table('support_conversations')
+            ->where('farm_id', $farm->id)
+            ->where('customer_id', $customer->id)
+            ->value('id');
+
+        $this->actingAs($support, 'sanctum')
+            ->getJson("/api/v1/crm/support-conversations?farm_id={$farm->id}")
+            ->assertOk()
+            ->assertJsonPath('data.0.customer.id', (string) $customer->id)
+            ->assertJsonPath('data.0.customer.name', 'Amina Farmer');
+
+        $this->actingAs($support, 'sanctum')
+            ->getJson("/api/v1/crm/support-conversations/{$conversationId}")
+            ->assertOk()
+            ->assertJsonPath('data.customer.id', (string) $customer->id);
     }
 
     public function test_farm_broadcast_is_fanned_out_only_to_other_app_members(): void

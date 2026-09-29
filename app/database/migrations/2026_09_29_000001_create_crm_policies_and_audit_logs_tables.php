@@ -20,8 +20,8 @@ return new class extends Migration
             $table->text('details')->nullable();
             $table->text('notes')->nullable();
             $table->json('visible_pages');
-            $table->foreignId('created_by')->constrained('users')->restrictOnDelete();
-            $table->foreignId('updated_by')->constrained('users')->restrictOnDelete();
+            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignId('updated_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
             $table->index(['farm_id', 'status', 'effective_date']);
         });
