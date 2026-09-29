@@ -116,7 +116,7 @@ echo ""
 # Test API health
 echo "[10/10] Testing API health..."
 HEALTH_CHECK=$(curl -s https://$API_DOMAIN/up || echo "FAILED")
-if echo "$HEALTH_CHECK" | grep -q "ok"; then
+if echo "$HEALTH_CHECK" | grep -q "Application up"; then
     echo "✓ API health check passed"
 else
     echo "⚠ API health check failed. Verify domain and HTTPS configuration."
