@@ -57,7 +57,7 @@ return new class extends Migration
             $table->text('push_error')->nullable();
             $table->timestamps();
 
-            $table->unique(['broadcast_id', 'recipient_id']);
+            $table->unique(['broadcast_id', 'recipient_id'], 'broadcast_recipients_unique');
             $table->index(['broadcast_id', 'push_status']);
         });
     }
