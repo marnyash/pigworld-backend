@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
@@ -30,12 +31,14 @@ class PasswordResetController
         ]);
 
         $status = Password::reset($data, function (User $user, string $password): void {
-            $user->forceFill([
-                'password' => $password,
-                'remember_token' => Str::random(60),
-            ])->save();
-            $user->tokens()->delete();
-            $user->refreshTokens()->update(['revoked_at' => now()]);
+            DB::transaction(function () use ($user, $password): void {
+                $user->forceFill([
+                    'password' => $password,
+                    'remember_token' => Str::random(60),
+                ])->save();
+                $user->tokens()->delete();
+                $user->refreshTokens()->update(['revoked_at' => now()]);
+            });
         });
 
         if ($status !== Password::PASSWORD_RESET) {

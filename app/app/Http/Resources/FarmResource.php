@@ -14,6 +14,8 @@ class FarmResource extends JsonResource
             'id' => (string) $this->id,
             'name' => $this->name,
             'location' => $this->location,
+            'latitude' => $this->latitude === null ? null : (float) $this->latitude,
+            'longitude' => $this->longitude === null ? null : (float) $this->longitude,
             'invite_code' => $this->invite_code,
             'mother_pig_count' => $this->mother_pig_count,
             'piglet_groups' => $this->piglet_groups ?? [],

@@ -17,6 +17,7 @@ class UserResource extends JsonResource
             'phone' => $this->phone,
             'role' => $this->role,
             'crm_role' => $this->crm_role,
+            'is_global_crm_admin' => (bool) $this->is_global_crm_admin,
             'crm_closed_at' => $this->crm_closed_at?->toIso8601String(),
         ];
     }

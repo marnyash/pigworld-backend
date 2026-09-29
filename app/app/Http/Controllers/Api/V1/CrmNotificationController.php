@@ -17,7 +17,7 @@ class CrmNotificationController extends Controller
         $user = $request->user();
         $this->crmStaff($user);
         $farmId = $request->integer('farm_id');
-        if (! $user->farms()->where('farms.id', $farmId)->exists()) abort(403, 'You do not have access to this farm.');
+        if (! $user->is_global_crm_admin && ! $user->farms()->where('farms.id', $farmId)->exists()) abort(403, 'You do not have access to this farm.');
         $items = \DB::table('crm_notifications')
             ->leftJoin('users as senders', 'senders.id', '=', 'crm_notifications.sender_id')
             ->leftJoin('users as recipients', 'recipients.id', '=', 'crm_notifications.recipient_id')
@@ -32,7 +32,7 @@ class CrmNotificationController extends Controller
     {
         $user = $request->user();
         $role = $user->crm_role ?? ($user->role === 'farmOwner' ? 'admin' : null);
-        if (! in_array($role, ['admin', 'customer_support'], true)) {
+        if (! $user->is_global_crm_admin && ! in_array($role, ['admin', 'customer_support'], true)) {
             abort(403, 'Only admins and customer support can send notifications.');
         }
         $data = $request->validate([
@@ -42,7 +42,7 @@ class CrmNotificationController extends Controller
             'title' => ['sometimes', 'string', 'max:160'],
             'kind' => ['sometimes', 'in:reply,broadcast'],
         ]);
-        if (! $user->farms()->where('farms.id', $data['farm_id'])->exists()) {
+        if (! $user->is_global_crm_admin && ! $user->farms()->where('farms.id', $data['farm_id'])->exists()) {
             abort(403, 'You do not have access to this farm.');
         }
         if (! empty($data['recipient_id'])) {
@@ -149,7 +149,7 @@ class CrmNotificationController extends Controller
         $user = $request->user();
         $this->crmStaff($user);
         $data = $request->validate(['farm_id' => ['required', 'integer']]);
-        abort_unless($user->farms()->where('farms.id', $data['farm_id'])->exists(), 403, 'You do not have access to this farm.');
+        abort_unless($user->is_global_crm_admin || $user->farms()->where('farms.id', $data['farm_id'])->exists(), 403, 'You do not have access to this farm.');
 
         $items = DB::table('communication_broadcasts')
             ->join('users as senders', 'senders.id', '=', 'communication_broadcasts.sender_id')
@@ -185,7 +185,7 @@ class CrmNotificationController extends Controller
     private function crmStaff(User $user): void
     {
         $role = $user->crm_role ?? ($user->role === 'farmOwner' ? 'admin' : null);
-        if (! in_array($role, ['admin', 'finance', 'customer_support'], true)) {
+        if (! $user->is_global_crm_admin && ! in_array($role, ['admin', 'finance', 'customer_support'], true)) {
             abort(403, 'Only CRM staff can access notifications.');
         }
     }

@@ -15,6 +15,8 @@ class Farm extends Model
     protected $fillable = [
         'name',
         'location',
+        'latitude',
+        'longitude',
         'created_by',
         'invite_code',
         'mother_pig_count',
@@ -27,6 +29,8 @@ class Farm extends Model
     {
         return [
             'mother_pig_count' => 'integer',
+            'latitude' => 'float',
+            'longitude' => 'float',
             'piglet_groups' => 'array',
             'pregnant_pig_count' => 'integer',
         ];
