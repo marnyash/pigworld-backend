@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\RefreshToken;
 use App\Models\User;
-use Illuminate\Auth\Notifications\ResetPassword;
+use App\Notifications\PasswordResetNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
@@ -31,8 +31,12 @@ class PasswordResetFlowTest extends TestCase
             ->assertJsonPath('message', 'If that email is registered, a reset link has been sent.');
 
         $plainToken = null;
-        Notification::assertSentTo($user, ResetPassword::class, function (ResetPassword $notification) use (&$plainToken): bool {
+        Notification::assertSentTo($user, PasswordResetNotification::class, function (PasswordResetNotification $notification) use ($user, &$plainToken): bool {
             $plainToken = $notification->token;
+            $mail = $notification->toMail($user);
+            $this->assertSame('emails.auth.password-reset', $mail->view);
+            $this->assertStringContainsString($plainToken, $mail->viewData['resetUrl']);
+            $this->assertStringContainsString(rawurlencode($user->email), $mail->viewData['resetUrl']);
 
             return true;
         });
@@ -40,8 +44,11 @@ class PasswordResetFlowTest extends TestCase
 
         $this->get(route('password.reset', ['token' => $plainToken, 'email' => $user->email]))
             ->assertOk()
-            ->assertSee('Reset your password')
-            ->assertSee($user->email);
+            ->assertSee('Set a new password')
+            ->assertSee($user->email)
+            ->assertSee('name="password_confirmation"', false)
+            ->assertSee('viewport-fit=cover', false)
+            ->assertSee('Save new password');
 
         $this->post(route('password.update'), [
             'token' => $plainToken,
