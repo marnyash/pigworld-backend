@@ -28,6 +28,8 @@ use App\Http\Controllers\Api\V1\FeedController;
 use App\Http\Controllers\Api\V1\FarmOverviewController;
 use App\Http\Controllers\Api\V1\FarmNotificationController;
 use App\Http\Controllers\Api\V1\FarmSupportConversationController;
+use App\Http\Controllers\Api\V1\FarmTaskController;
+use App\Http\Controllers\Api\V1\FarmSalesController;
 use App\Http\Controllers\Api\V1\MpesaPaymentController;
 use App\Http\Controllers\Api\V1\GrowthController;
 use App\Http\Controllers\Api\V1\InventoryController;
@@ -68,6 +70,16 @@ Route::prefix('v1')->group(function () {
         Route::get('farms/{farm}/support-conversation', [FarmSupportConversationController::class, 'show']);
         Route::post('farms/{farm}/support-conversation/messages', [FarmSupportConversationController::class, 'storeMessage']);
         Route::patch('farms/{farm}/support-conversation/read', [FarmSupportConversationController::class, 'markAsRead']);
+        Route::get('farms/{farm}/tasks', [FarmTaskController::class, 'index']);
+        Route::post('farms/{farm}/tasks', [FarmTaskController::class, 'store']);
+        Route::patch('farms/{farm}/tasks/{task}', [FarmTaskController::class, 'update']);
+        Route::delete('farms/{farm}/tasks/{task}', [FarmTaskController::class, 'destroy']);
+        Route::get('farms/{farm}/buyers', [FarmSalesController::class, 'buyers']);
+        Route::post('farms/{farm}/buyers', [FarmSalesController::class, 'storeBuyer']);
+        Route::patch('farms/{farm}/buyers/{buyer}', [FarmSalesController::class, 'updateBuyer']);
+        Route::get('farms/{farm}/sales', [FarmSalesController::class, 'sales']);
+        Route::post('farms/{farm}/sales', [FarmSalesController::class, 'storeSale']);
+        Route::patch('farms/{farm}/sales/{sale}', [FarmSalesController::class, 'updateSale']);
 
         Route::apiResource('crm/customers', CustomerController::class);
         Route::get('crm/tasks', [CrmTaskController::class, 'farmIndex']);

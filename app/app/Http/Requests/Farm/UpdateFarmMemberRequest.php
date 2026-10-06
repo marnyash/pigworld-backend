@@ -15,7 +15,7 @@ class UpdateFarmMemberRequest extends FormRequest
     {
         return [
             'permissions' => ['nullable', 'array'],
-            'permissions.*' => ['string', 'in:viewDashboard,manageHerd,manageBreeding,manageFeed,manageFinance,manageSales,viewReports,manageSettings,manageMembers,managePolicies,linkFarmManager'],
+            'permissions.*' => ['string', 'in:viewDashboard,manageHerd,manageBreeding,manageFeed,manageFinance,viewSales,manageSales,viewTasks,manageTasks,viewReports,manageSettings,manageMembers,managePolicies,linkFarmManager'],
         ];
     }
 }

@@ -126,4 +126,10 @@ class Farm extends Model
     {
         return $this->hasMany(InventoryItem::class);
     }
+
+    /** @return HasMany<FarmTask, Farm> */
+    public function tasks(): HasMany
+    {
+        return $this->hasMany(FarmTask::class);
+    }
 }
