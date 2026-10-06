@@ -1,5 +1,4 @@
 ---
 deployment:
   tasks:
-    - cd /home/pigworldsmart/api.pigworldsmart.com
-    - BACKEND_DIR=/home/pigworldsmart/api.pigworldsmart.com/app API_DOMAIN=api.pigworldsmart.com /bin/bash deploy-backend.sh
+    - BACKEND_DIR=/home/pigworldsmart/api.pigworldsmart.com/app API_DOMAIN=api.pigworldsmart.com CRM_DOMAIN=crm.pigworldsmart.com /bin/bash /home/pigworldsmart/api.pigworldsmart.com/deploy-backend.sh
