@@ -127,6 +127,7 @@ Route::prefix('v1')->group(function () {
         Route::get('farms/{farm}/animals', [HerdController::class, 'index']);
         Route::post('farms/{farm}/animals', [HerdController::class, 'store']);
         Route::get('farms/{farm}/animals/{animal}', [HerdController::class, 'show']);
+        Route::get('farms/{farm}/animals/{animal}/report', [ReportsController::class, 'animalReport']);
         Route::patch('farms/{farm}/animals/{animal}', [HerdController::class, 'update']);
         Route::delete('farms/{farm}/animals/{animal}', [HerdController::class, 'destroy']);
 
