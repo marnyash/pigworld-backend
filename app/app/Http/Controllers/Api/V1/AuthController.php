@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\ForgotPasswordRequest;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\RefreshTokenRequest;
+use App\Http\Requests\Auth\ResendLoginOtpRequest;
 use App\Http\Requests\Auth\RegisterRequest;
 use App\Http\Requests\Auth\VerifyLoginOtpRequest;
 use App\Http\Resources\FarmResource;
@@ -22,6 +23,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Laravel\Sanctum\PersonalAccessToken;
@@ -170,14 +172,76 @@ class AuthController extends Controller
         return $this->authResponse($user, $rememberMe);
     }
 
+    public function resendLoginOtp(ResendLoginOtpRequest $request): JsonResponse
+    {
+        $data = $request->validated();
+        [$challenge, $code] = DB::transaction(function () use ($data): array {
+            $challenge = LoginOtp::query()
+                ->where('challenge_id', $data['challenge_id'])
+                ->lockForUpdate()
+                ->first();
+
+            if ($challenge === null || $challenge->consumed_at !== null || $challenge->attempts >= 5) {
+                throw ValidationException::withMessages([
+                    'challenge_id' => ['The sign-in challenge is no longer valid. Sign in again to request a new code.'],
+                ]);
+            }
+
+            $rateLimitKey = 'login-otp-resend:'.$challenge->user_id;
+            if (RateLimiter::tooManyAttempts($rateLimitKey, 3)) {
+                throw ValidationException::withMessages([
+                    'challenge_id' => ['Too many code requests. Wait a few minutes and try again.'],
+                ]);
+            }
+            RateLimiter::hit($rateLimitKey, 600);
+
+            $code = (string) random_int(100000, 999999);
+            $challenge->update([
+                'code_hash' => Hash::make($code),
+                'attempts' => 0,
+                'expires_at' => now()->addMinutes(10),
+            ]);
+
+            return [$challenge->fresh('user'), $code];
+        });
+
+        try {
+            Notification::send($challenge->user, new LoginOtpNotification($code));
+        } catch (Throwable $exception) {
+            $challenge->update(['consumed_at' => now()]);
+            report($exception);
+            throw ValidationException::withMessages([
+                'challenge_id' => ['Unable to send a verification code right now. Please try again.'],
+            ]);
+        }
+
+        return response()->json([
+            'otp_required' => true,
+            'challenge_id' => $challenge->challenge_id,
+            'destination' => $this->maskedEmail($challenge->user->email),
+            'expires_in' => 600,
+        ]);
+    }
+
     public function loginWithGoogle(Request $request): JsonResponse
+    {
+        return $this->loginWithFirebase($request);
+    }
+
+    public function loginWithFirebase(Request $request): JsonResponse
     {
         $idToken = $request->validate(['id_token' => ['required', 'string']])['id_token'];
         $claims = $this->firebaseTokens->verify($idToken);
         $email = $claims['email'] ?? null;
+        $provider = $claims['firebase']['sign_in_provider'] ?? null;
 
-        if (! is_string($email) || ! filter_var($email, FILTER_VALIDATE_EMAIL) || ($claims['email_verified'] ?? false) !== true) {
-            throw ValidationException::withMessages(['id_token' => ['The Google account email is not verified.']]);
+        if (! is_string($email)
+            || ! filter_var($email, FILTER_VALIDATE_EMAIL)
+            || ($claims['email_verified'] ?? false) !== true
+            || ! in_array($provider, ['google.com', 'apple.com'], true)) {
+            throw ValidationException::withMessages([
+                'id_token' => ['The federated account email is not verified or the sign-in provider is not supported.'],
+            ]);
         }
 
         $user = User::where('email', $email)->first();

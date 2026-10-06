@@ -18,9 +18,19 @@ class FeedController extends Controller
     public function index(Request $request, Farm $farm): JsonResponse
     {
         $this->authorizeFeedAccess($request, $farm);
+        $pricedUsage = DB::table('feed_usages')
+            ->join('feed_stocks', 'feed_stocks.id', '=', 'feed_usages.feed_stock_id')
+            ->where('feed_usages.farm_id', $farm->id)
+            ->whereBetween('feed_usages.used_at', [now()->startOfMonth(), now()])
+            ->whereNotNull('feed_stocks.unit_cost')
+            ->selectRaw('COALESCE(SUM(feed_usages.quantity * feed_stocks.unit_cost), 0) AS total, COUNT(*) AS records')
+            ->first();
+
         return response()->json([
             'stock' => FeedStockResource::collection($farm->feedStocks()->latest()->get()),
             'usage' => FeedUsageResource::collection($farm->feedUsages()->with('stock')->latest('used_at')->limit(30)->get()),
+            'monthly_feed_cost' => (float) ($pricedUsage->total ?? 0),
+            'has_monthly_feed_cost' => (int) ($pricedUsage->records ?? 0) > 0,
         ]);
     }
 
@@ -37,6 +47,9 @@ class FeedController extends Controller
         $data = $request->validated();
         if (! empty($data['feed_stock_id'])) {
             $stock = $farm->feedStocks()->findOrFail($data['feed_stock_id']);
+            if ($stock->unit !== $data['unit']) {
+                return response()->json(['message' => 'Usage unit must match the selected feed stock unit.'], 422);
+            }
             if ((float) $stock->quantity < (float) $data['quantity']) {
                 return response()->json(['message' => 'Usage exceeds available stock.'], 422);
             }

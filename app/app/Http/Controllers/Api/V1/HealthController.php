@@ -17,7 +17,7 @@ class HealthController extends Controller
     {
         $this->authorizeHealthAccess($request, $farm);
 
-        $query = $farm->healthRecords();
+        $query = $farm->healthRecords()->with('animal:id,tag');
 
         // Filter by type if provided
         if ($request->has('type')) {
@@ -38,12 +38,18 @@ class HealthController extends Controller
 
     public function store(StoreHealthRecordRequest $request, Farm $farm): JsonResponse
     {
-        $this->authorizeHealthAccess($request, $farm);
+        $this->authorizeHealthAccess($request, $farm, write: true);
+
+        $data = $request->validated();
+        if (! isset($data['animal_id'])) {
+            $data['animal_id'] = $this->resolveAnimalId($farm, $data['pig_id'] ?? '');
+        }
+        unset($data['pig_id']);
 
         $record = $farm->healthRecords()->create([
-            ...$request->validated(),
+            ...$data,
             'created_by' => $request->user()->id,
-        ]);
+        ])->load('animal:id,tag');
 
         return response()->json(['data' => new HealthRecordResource($record)], 201);
     }
@@ -53,22 +59,27 @@ class HealthController extends Controller
         $this->authorizeHealthAccess($request, $farm);
         abort_if($healthRecord->farm_id !== $farm->id, 404);
 
-        return response()->json(['data' => new HealthRecordResource($healthRecord)]);
+        return response()->json(['data' => new HealthRecordResource($healthRecord->load('animal:id,tag'))]);
     }
 
     public function update(UpdateHealthRecordRequest $request, Farm $farm, HealthRecord $healthRecord): JsonResponse
     {
-        $this->authorizeHealthAccess($request, $farm);
+        $this->authorizeHealthAccess($request, $farm, write: true);
         abort_if($healthRecord->farm_id !== $farm->id, 404);
 
-        $healthRecord->update($request->validated());
+        $data = $request->validated();
+        if (array_key_exists('pig_id', $data)) {
+            $data['animal_id'] = $this->resolveAnimalId($farm, $data['pig_id'] ?? '');
+        }
+        unset($data['pig_id']);
+        $healthRecord->update($data);
 
-        return response()->json(['data' => new HealthRecordResource($healthRecord->fresh())]);
+        return response()->json(['data' => new HealthRecordResource($healthRecord->fresh()->load('animal:id,tag'))]);
     }
 
     public function destroy(Request $request, Farm $farm, HealthRecord $healthRecord): JsonResponse
     {
-        $this->authorizeHealthAccess($request, $farm);
+        $this->authorizeHealthAccess($request, $farm, write: true);
         abort_if($healthRecord->farm_id !== $farm->id, 404);
 
         $healthRecord->delete();
@@ -84,8 +95,10 @@ class HealthController extends Controller
         $this->authorizeHealthAccess($request, $farm);
 
         $alerts = $farm->healthRecords()
-            ->whereIn('status', ['critical', 'recovering'])
-            ->orWhere('type', 'mortality')
+            ->where(function ($query) {
+                $query->whereIn('status', ['critical', 'recovering'])
+                    ->orWhere('type', 'mortality');
+            })
             ->latest()
             ->get();
 
@@ -138,7 +151,7 @@ class HealthController extends Controller
         ]);
     }
 
-    private function authorizeHealthAccess(Request $request, Farm $farm): void
+    private function authorizeHealthAccess(Request $request, Farm $farm, bool $write = false): void
     {
         $user = $request->user();
         $membership = $user->farms()->where('farms.id', $farm->id)->first();
@@ -155,15 +168,33 @@ class HealthController extends Controller
             ? $this->defaultPermissions($user->role)
             : json_decode($membership->pivot->permissions, true);
 
-        if (! in_array('manageHealth', $permissions ?? [], true)) {
-            abort(403, 'You do not have permission to manage health records.');
+        $canManage = in_array('manageHealth', $permissions ?? [], true);
+        $canView = $canManage || in_array('viewHealth', $permissions ?? [], true);
+        if ($write ? ! $canManage : ! $canView) {
+            abort(403, $write
+                ? 'You do not have permission to manage health records.'
+                : 'You do not have permission to view health records.');
         }
+    }
+
+    private function resolveAnimalId(Farm $farm, string $identifier): int
+    {
+        $animal = $farm->animals()->where('tag', $identifier)->first();
+        if ($animal === null && ctype_digit($identifier)) {
+            $animal = $farm->animals()->whereKey((int) $identifier)->first();
+        }
+
+        if ($animal === null) {
+            abort(422, 'The selected pig does not belong to this farm.');
+        }
+
+        return (int) $animal->id;
     }
 
     private function defaultPermissions(string $role): array
     {
         return match ($role) {
-            'farmManager' => ['manageHerd', 'manageFeed', 'manageHealth', 'viewReports'],
+            'farmManager' => ['manageHerd', 'manageFeed', 'viewHealth', 'manageHealth', 'viewReports'],
             'veterinarian' => ['viewHerd', 'manageHealth'],
             'farmWorker' => ['viewHerd', 'viewHealth'],
             default => [],

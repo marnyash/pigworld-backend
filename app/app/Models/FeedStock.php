@@ -11,11 +11,11 @@ class FeedStock extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['farm_id', 'created_by', 'name', 'quantity', 'unit', 'location'];
+    protected $fillable = ['farm_id', 'created_by', 'name', 'quantity', 'unit', 'unit_cost', 'location'];
 
     protected function casts(): array
     {
-        return ['quantity' => 'decimal:2'];
+        return ['quantity' => 'decimal:2', 'unit_cost' => 'decimal:2'];
     }
 
     public function farm(): BelongsTo { return $this->belongsTo(Farm::class); }

@@ -80,7 +80,7 @@ class FirebaseIdTokenVerifier
     private function invalid(): never
     {
         throw ValidationException::withMessages([
-            'id_token' => ['The Google sign-in token is invalid or has expired.'],
+            'id_token' => ['The federated sign-in token is invalid or has expired.'],
         ]);
     }
 }

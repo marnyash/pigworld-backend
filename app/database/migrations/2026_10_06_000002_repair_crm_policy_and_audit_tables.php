@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         if (! Schema::hasTable('crm_policies')) {
-            Schema::create('crm_policies', function (Blueprint $table) {
+            Schema::create('crm_policies', function (Blueprint $table): void {
                 $table->id();
                 $table->foreignId('farm_id')->constrained()->cascadeOnDelete();
                 $table->string('title', 160);
@@ -29,7 +29,7 @@ return new class extends Migration
         }
 
         if (! Schema::hasTable('crm_audit_logs')) {
-            Schema::create('crm_audit_logs', function (Blueprint $table) {
+            Schema::create('crm_audit_logs', function (Blueprint $table): void {
                 $table->id();
                 $table->foreignId('farm_id')->constrained()->cascadeOnDelete();
                 $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
@@ -44,7 +44,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('crm_audit_logs');
-        Schema::dropIfExists('crm_policies');
+        // This migration only restores tables that were absent; preserve data on rollback.
     }
 };

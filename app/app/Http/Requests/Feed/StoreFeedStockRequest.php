@@ -14,6 +14,7 @@ class StoreFeedStockRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'quantity' => ['required', 'numeric', 'gt:0'],
             'unit' => ['required', 'string', 'max:20'],
+            'unit_cost' => ['nullable', 'numeric', 'gte:0'],
             'location' => ['nullable', 'string', 'max:255'],
         ];
     }

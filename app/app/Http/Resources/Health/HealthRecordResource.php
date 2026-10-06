@@ -14,7 +14,7 @@ class HealthRecordResource extends JsonResource
             'id' => (string) $this->id,
             'farm_id' => (string) $this->farm_id,
             'animal_id' => (string) $this->animal_id,
-            'pig_id' => (string) $this->animal_id, // Alias for mobile app compatibility
+            'pig_id' => $this->animal?->tag ?? (string) $this->animal_id,
             'type' => $this->type,
             'status' => $this->status,
             'rfid' => $this->rfid,

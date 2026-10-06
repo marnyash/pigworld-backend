@@ -16,6 +16,7 @@ class FeedStockResource extends JsonResource
             'name' => $this->name,
             'quantity' => (float) $this->quantity,
             'unit' => $this->unit,
+            'unit_cost' => $this->unit_cost === null ? null : (float) $this->unit_cost,
             'location' => $this->location,
             'created_at' => $this->created_at?->toIso8601String(),
         ];
