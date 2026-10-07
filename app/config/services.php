@@ -4,6 +4,7 @@ return [
 
     'firebase' => [
         'project_id' => env('FIREBASE_PROJECT_ID', 'pigworld-smart'),
+        'credentials' => env('FIREBASE_CREDENTIALS'),
     ],
 
     /*

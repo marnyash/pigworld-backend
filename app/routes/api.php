@@ -1,41 +1,42 @@
 <?php
 
 use App\Http\Controllers\Api\V1\AuthController;
-use App\Http\Controllers\Api\V1\CustomerController;
-use App\Http\Controllers\Api\V1\CustomerInteractionController;
-use App\Http\Controllers\Api\V1\CrmTaskController;
-use App\Http\Controllers\Api\V1\CrmStaffCategoryController;
-use App\Http\Controllers\Api\V1\CrmPolicyController;
+use App\Http\Controllers\Api\V1\CrmAdminController;
 use App\Http\Controllers\Api\V1\CrmAuditLogController;
 use App\Http\Controllers\Api\V1\CrmCustomerEventController;
-use App\Http\Controllers\Api\V1\FarmMemberController;
-use App\Http\Controllers\Api\V1\FarmController;
-use App\Http\Controllers\Api\V1\FarmNameChangeRequestController;
-use App\Http\Controllers\Api\V1\FarmJoinRequestController;
-use App\Http\Controllers\Api\V1\FarmSubscriptionController;
-use App\Http\Controllers\Api\V1\HealthController;
-use App\Http\Controllers\Api\V1\HerdController;
-use App\Http\Controllers\Api\V1\CrmMemberController;
-use App\Http\Controllers\Api\V1\CrmNotificationController;
-use App\Http\Controllers\Api\V1\CrmAdminController;
-use App\Http\Controllers\Api\V1\CrmSupportConversationController;
-use App\Http\Controllers\Api\V1\CrmReportController;
 use App\Http\Controllers\Api\V1\CrmDashboardController;
 use App\Http\Controllers\Api\V1\CrmDirectoryController;
+use App\Http\Controllers\Api\V1\CrmMemberController;
+use App\Http\Controllers\Api\V1\CrmNotificationController;
+use App\Http\Controllers\Api\V1\CrmPolicyController;
+use App\Http\Controllers\Api\V1\CrmReportController;
+use App\Http\Controllers\Api\V1\CrmStaffCategoryController;
+use App\Http\Controllers\Api\V1\CrmSupportConversationController;
+use App\Http\Controllers\Api\V1\CrmTaskController;
+use App\Http\Controllers\Api\V1\CustomerController;
+use App\Http\Controllers\Api\V1\CustomerInteractionController;
 use App\Http\Controllers\Api\V1\CustomerOrderController;
-use App\Http\Controllers\Api\V1\SubscriptionPlanController;
-use App\Http\Controllers\Api\V1\FeedController;
-use App\Http\Controllers\Api\V1\FarmOverviewController;
+use App\Http\Controllers\Api\V1\FarmController;
+use App\Http\Controllers\Api\V1\FarmFinanceController;
+use App\Http\Controllers\Api\V1\FarmJoinRequestController;
+use App\Http\Controllers\Api\V1\FarmMemberController;
+use App\Http\Controllers\Api\V1\FarmNameChangeRequestController;
 use App\Http\Controllers\Api\V1\FarmNotificationController;
+use App\Http\Controllers\Api\V1\FarmOverviewController;
+use App\Http\Controllers\Api\V1\FarmSalesController;
+use App\Http\Controllers\Api\V1\FarmSubscriptionController;
 use App\Http\Controllers\Api\V1\FarmSupportConversationController;
 use App\Http\Controllers\Api\V1\FarmTaskController;
-use App\Http\Controllers\Api\V1\FarmFinanceController;
-use App\Http\Controllers\Api\V1\FarmSalesController;
-use App\Http\Controllers\Api\V1\MpesaPaymentController;
+use App\Http\Controllers\Api\V1\FeedController;
 use App\Http\Controllers\Api\V1\GrowthController;
+use App\Http\Controllers\Api\V1\HealthController;
+use App\Http\Controllers\Api\V1\HerdController;
 use App\Http\Controllers\Api\V1\InventoryController;
+use App\Http\Controllers\Api\V1\MpesaPaymentController;
 use App\Http\Controllers\Api\V1\PregnancyController;
+use App\Http\Controllers\Api\V1\PushDeviceController;
 use App\Http\Controllers\Api\V1\ReportsController;
+use App\Http\Controllers\Api\V1\SubscriptionPlanController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -51,6 +52,8 @@ Route::prefix('v1')->group(function () {
     });
 
     Route::middleware('auth:sanctum')->group(function () {
+        Route::post('/auth/push-token', [PushDeviceController::class, 'store']);
+        Route::delete('/auth/push-token', [PushDeviceController::class, 'destroy']);
         Route::post('/auth/logout', [AuthController::class, 'logout']);
         Route::get('/auth/me', [AuthController::class, 'me']);
         Route::patch('/auth/profile', [AuthController::class, 'updateProfile']);
@@ -141,6 +144,7 @@ Route::prefix('v1')->group(function () {
         Route::get('farms/{farm}/join-requests', [FarmJoinRequestController::class, 'index']);
         Route::patch('farms/{farm}/join-requests/{farmJoinRequest}', [FarmJoinRequestController::class, 'review']);
         Route::patch('farms/{farm}/subscription', [FarmSubscriptionController::class, 'update']);
+        Route::get('farms/{farm}/payments', [FarmSubscriptionController::class, 'payments']);
         Route::post('farms/{farm}/subscription/payment', [MpesaPaymentController::class, 'store']);
         Route::get('farms/{farm}/animals', [HerdController::class, 'index']);
         Route::post('farms/{farm}/animals', [HerdController::class, 'store']);
