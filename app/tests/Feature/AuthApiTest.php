@@ -34,6 +34,13 @@ class AuthApiTest extends TestCase
             ->assertJsonPath('user.phone', '+15551234567')
             ->assertJsonPath('user.role', 'farmOwner')
             ->assertJsonPath('farms.0.name', 'Green Valley Farm');
+        $this->assertDatabaseHas('farm_notifications', [
+            'farm_id' => $registration->json('farms.0.id'),
+            'recipient_id' => $registration->json('user.id'),
+            'type' => 'welcome',
+            'title' => 'Welcome Owner to Pig World Smart',
+            'body' => 'We will be with you all the way.',
+        ]);
 
         Notification::fake();
         $login = $this->beginOtpLogin('+15551234567', 'password123');
@@ -67,6 +74,29 @@ class AuthApiTest extends TestCase
             ->assertJsonPath('farms.0.name', 'Mobile Farm')
             ->assertJsonPath('farms.0.mother_pig_count', 12)
             ->assertJsonPath('farms.0.pregnant_pig_count', 4);
+    }
+
+    public function test_new_invited_farm_member_receives_a_personal_welcome_notification(): void
+    {
+        $farm = Farm::create(['name' => 'Invite Farm']);
+
+        $response = $this->postJson('/api/v1/auth/register', [
+            'name' => 'New Manager',
+            'email' => 'manager@example.com',
+            'phone' => '+254700000123',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+            'role' => 'farmManager',
+            'invite_code' => $farm->invite_code,
+        ])->assertOk();
+
+        $this->assertDatabaseHas('farm_notifications', [
+            'farm_id' => $farm->id,
+            'recipient_id' => $response->json('user.id'),
+            'type' => 'welcome',
+            'title' => 'Welcome New Manager to Pig World Smart',
+            'body' => 'We will be with you all the way.',
+        ]);
     }
 
     public function test_authenticated_user_can_upload_a_persisted_profile_avatar(): void

@@ -102,6 +102,44 @@ class CrmMessagingApiTest extends TestCase
         ]);
     }
 
+    public function test_crm_broadcast_reaches_every_app_member_in_the_farm_notifications(): void
+    {
+        $owner = User::factory()->create(['role' => 'farmOwner']);
+        $manager = User::factory()->create(['role' => 'farmManager']);
+        $worker = User::factory()->create(['role' => 'farmWorker']);
+        $support = User::factory()->create(['role' => 'farmWorker', 'crm_role' => 'customer_support']);
+        $outsider = User::factory()->create(['role' => 'farmWorker']);
+        $farm = Farm::create(['name' => 'Broadcast Farm']);
+        $farm->users()->attach([$owner->id, $manager->id, $worker->id, $support->id]);
+
+        $this->actingAs($support, 'sanctum')
+            ->postJson('/api/v1/crm/notifications', [
+                'farm_id' => $farm->id,
+                'kind' => 'broadcast',
+                'title' => 'Farm update',
+                'message' => 'A new farm-wide announcement.',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.recipient_count', 3);
+
+        foreach ([$owner, $manager, $worker] as $recipient) {
+            $this->actingAs($recipient, 'sanctum')
+                ->getJson("/api/v1/farms/{$farm->id}/notifications")
+                ->assertOk()
+                ->assertJsonFragment([
+                    'type' => 'crm_broadcast',
+                    'title' => 'Farm update',
+                    'body' => 'A new farm-wide announcement.',
+                ]);
+        }
+
+        $this->assertDatabaseMissing('farm_notifications', [
+            'farm_id' => $farm->id,
+            'recipient_id' => $outsider->id,
+            'type' => 'crm_broadcast',
+        ]);
+    }
+
     public function test_support_thread_tracks_agent_identity_read_state_and_assignment(): void
     {
         $owner = User::factory()->create(['role' => 'farmOwner']);

@@ -74,6 +74,7 @@ class CrmNotificationController extends Controller
                 : User::query()
                     ->whereHas('farms', fn ($query) => $query->where('farms.id', $data['farm_id']))
                     ->whereKeyNot($user->id)
+                    ->whereNull('crm_closed_at')
                     ->where(fn ($query) => $query->where('role', 'farmOwner')
                         ->orWhere(fn ($query) => $query->whereIn('role', ['farmManager', 'farmWorker'])->whereNull('crm_role')))
                     ->get();

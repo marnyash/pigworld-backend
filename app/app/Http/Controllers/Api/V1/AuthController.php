@@ -12,6 +12,7 @@ use App\Http\Requests\Auth\VerifyLoginOtpRequest;
 use App\Http\Resources\FarmResource;
 use App\Http\Resources\UserResource;
 use App\Models\Farm;
+use App\Models\FarmNotification;
 use App\Models\LoginOtp;
 use App\Models\User;
 use App\Notifications\LoginOtpNotification;
@@ -58,6 +59,7 @@ class AuthController extends Controller
             }
 
             $user = $matches->first();
+            $isNewUser = $user === null;
             if ($user !== null) {
                 if (! Hash::check($data['password'], $user->password)) {
                     throw ValidationException::withMessages([
@@ -84,8 +86,26 @@ class AuthController extends Controller
                     ? Farm::where('invite_code', $data['invite_code'])->firstOrFail()
                     : null);
 
+            if ($farm === null && $role !== 'farmOwner') {
+                $farm = $user->farms()->oldest('farms.id')->first();
+            }
+
             if ($farm !== null && ! $user->farms()->whereKey($farm->id)->exists()) {
                 $user->farms()->attach($farm->id);
+            }
+
+            if ($isNewUser && $farm !== null) {
+                FarmNotification::create([
+                    'farm_id' => $farm->id,
+                    'recipient_id' => $user->id,
+                    'type' => 'welcome',
+                    'title' => 'Welcome '.$user->name.' to Pig World Smart',
+                    'body' => 'We will be with you all the way.',
+                    'severity' => 'success',
+                    'related_type' => 'user',
+                    'related_id' => $user->id,
+                    'action_route' => '/home',
+                ]);
             }
 
             return [$user];
