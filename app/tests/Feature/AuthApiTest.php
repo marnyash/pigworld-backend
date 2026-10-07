@@ -7,6 +7,8 @@ use App\Models\RefreshToken;
 use App\Models\User;
 use App\Notifications\LoginOtpNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
@@ -63,6 +65,42 @@ class AuthApiTest extends TestCase
             ->assertJsonPath('farms.0.name', 'Mobile Farm')
             ->assertJsonPath('farms.0.mother_pig_count', 12)
             ->assertJsonPath('farms.0.pregnant_pig_count', 4);
+    }
+
+    public function test_registration_schema_repair_migration_restores_columns_missing_from_a_partial_deployment(): void
+    {
+        Schema::table('users', function (Blueprint $table): void {
+            $table->dropIndex('users_phone_index');
+            $table->dropColumn('phone');
+        });
+        Schema::table('farms', function (Blueprint $table): void {
+            $table->dropUnique('farms_invite_code_unique');
+            $table->dropColumn([
+                'invite_code',
+                'mother_pig_count',
+                'piglet_groups',
+                'pregnant_pig_count',
+            ]);
+        });
+        Schema::table('farm_user', function (Blueprint $table): void {
+            $table->dropColumn(['permissions', 'role']);
+        });
+
+        $migration = require database_path('migrations/2026_10_07_000001_repair_registration_schema.php');
+        $migration->up();
+        $migration->up();
+
+        $this->postJson('/api/v1/auth/register', [
+            'name' => 'Repaired Owner',
+            'email' => 'repaired-owner@example.com',
+            'phone' => '+15551234568',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+            'role' => 'farmOwner',
+            'farm_name' => 'Repaired Farm',
+        ])->assertOk()
+            ->assertJsonPath('user.phone', '+15551234568')
+            ->assertJsonPath('farms.0.name', 'Repaired Farm');
     }
 
     public function test_farm_owner_can_register_another_farm_using_the_existing_account(): void
