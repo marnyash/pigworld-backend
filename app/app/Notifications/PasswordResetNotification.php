@@ -10,9 +10,7 @@ class PasswordResetNotification extends Notification
 {
     use Queueable;
 
-    public function __construct(public readonly string $token)
-    {
-    }
+    public function __construct(public readonly string $token) {}
 
     /** @return array<int, string> */
     public function via(object $notifiable): array
@@ -22,10 +20,11 @@ class PasswordResetNotification extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
-        $resetUrl = route('password.reset', [
-            'token' => $this->token,
-            'email' => $notifiable->getEmailForPasswordReset(),
-        ]);
+        $resetUrl = rtrim((string) config('services.password_reset.frontend_url'), '/').'/'
+            .'?'.http_build_query([
+                'token' => $this->token,
+                'email' => $notifiable->getEmailForPasswordReset(),
+            ], '', '&', PHP_QUERY_RFC3986);
 
         return (new MailMessage)
             ->subject('Reset your Pig World Smart password')

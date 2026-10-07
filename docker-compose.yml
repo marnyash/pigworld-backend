@@ -57,6 +57,7 @@ services:
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - ./nginx/certs:/etc/nginx/certs:ro
       - ./app/public:/var/www/html/public:ro
+      - backend_storage:/var/www/html/storage:ro
     depends_on:
       backend:
         condition: service_healthy

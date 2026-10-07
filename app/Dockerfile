@@ -15,6 +15,7 @@ WORKDIR /var/www/html
 
 COPY . .
 COPY --from=vendor /app/vendor ./vendor
+COPY docker/uploads.ini /usr/local/etc/php/conf.d/uploads.ini
 
 RUN rm -f bootstrap/cache/*.php
 

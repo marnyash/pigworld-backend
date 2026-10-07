@@ -34,12 +34,16 @@ use App\Http\Controllers\Api\V1\HerdController;
 use App\Http\Controllers\Api\V1\InventoryController;
 use App\Http\Controllers\Api\V1\MpesaPaymentController;
 use App\Http\Controllers\Api\V1\PregnancyController;
+use App\Http\Controllers\Api\V1\PigMarketplaceController;
 use App\Http\Controllers\Api\V1\PushDeviceController;
 use App\Http\Controllers\Api\V1\ReportsController;
 use App\Http\Controllers\Api\V1\SubscriptionPlanController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
+    Route::get('marketplace/pigs', [PigMarketplaceController::class, 'browse'])->middleware('throttle:60,1');
+    Route::post('marketplace/pigs/{listing}/inquiries', [PigMarketplaceController::class, 'inquire'])->middleware('throttle:10,1');
+
     Route::middleware('throttle:auth')->group(function () {
         Route::post('/auth/register', [AuthController::class, 'register']);
         Route::post('/auth/login', [AuthController::class, 'login']);
@@ -49,6 +53,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/auth/firebase', [AuthController::class, 'loginWithFirebase']);
         Route::post('/auth/refresh', [AuthController::class, 'refresh']);
         Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword']);
+        Route::post('/auth/reset-password', [AuthController::class, 'resetPassword']);
     });
 
     Route::middleware('auth:sanctum')->group(function () {
@@ -87,6 +92,10 @@ Route::prefix('v1')->group(function () {
         Route::get('farms/{farm}/sales', [FarmSalesController::class, 'sales']);
         Route::post('farms/{farm}/sales', [FarmSalesController::class, 'storeSale']);
         Route::patch('farms/{farm}/sales/{sale}', [FarmSalesController::class, 'updateSale']);
+        Route::get('farms/{farm}/pig-listings', [PigMarketplaceController::class, 'farmListings']);
+        Route::post('farms/{farm}/pig-listings', [PigMarketplaceController::class, 'store']);
+        Route::patch('farms/{farm}/pig-listings/{listing}', [PigMarketplaceController::class, 'updateStatus']);
+        Route::patch('farms/{farm}/pig-listings/{listing}/inquiries/{inquiry}', [PigMarketplaceController::class, 'updateInquiryStatus']);
 
         Route::apiResource('crm/customers', CustomerController::class);
         Route::get('crm/tasks', [CrmTaskController::class, 'farmIndex']);

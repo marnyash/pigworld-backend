@@ -20,6 +20,7 @@ class Animal extends Model
         'status',
         'birth_date',
         'notes',
+        'image_path',
     ];
 
     protected function casts(): array

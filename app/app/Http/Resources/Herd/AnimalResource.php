@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Herd;
 
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -19,6 +20,9 @@ class AnimalResource extends JsonResource
             'status' => $this->status,
             'birth_date' => $this->birth_date?->toDateString(),
             'notes' => $this->notes,
+            'image_url' => $this->image_path === null
+                ? null
+                : Storage::disk('public')->url($this->image_path),
             'created_at' => $this->created_at?->toIso8601String(),
         ];
     }

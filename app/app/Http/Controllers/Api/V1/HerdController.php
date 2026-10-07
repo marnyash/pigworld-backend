@@ -10,6 +10,7 @@ use App\Models\Animal;
 use App\Models\Farm;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class HerdController extends Controller
 {
@@ -26,10 +27,25 @@ class HerdController extends Controller
     {
         $this->authorizeHerdAccess($request, $farm);
 
-        $animal = $farm->animals()->create([
-            ...$request->validated(),
+        $data = $request->safe()->except(['image']);
+        if ($request->hasFile('image')) {
+            $data['image_path'] = $request->file('image')->store(
+                "animal-images/{$farm->id}",
+                'public',
+            );
+        }
+
+        try {
+            $animal = $farm->animals()->create([
+                ...$data,
             'created_by' => $request->user()->id,
-        ]);
+            ]);
+        } catch (\Throwable $error) {
+            if (isset($data['image_path'])) {
+                Storage::disk('public')->delete($data['image_path']);
+            }
+            throw $error;
+        }
 
         return response()->json(['data' => new AnimalResource($animal)], 201);
     }

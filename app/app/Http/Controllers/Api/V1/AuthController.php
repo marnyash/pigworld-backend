@@ -6,8 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\ForgotPasswordRequest;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\RefreshTokenRequest;
-use App\Http\Requests\Auth\ResendLoginOtpRequest;
 use App\Http\Requests\Auth\RegisterRequest;
+use App\Http\Requests\Auth\ResendLoginOtpRequest;
 use App\Http\Requests\Auth\VerifyLoginOtpRequest;
 use App\Http\Resources\FarmResource;
 use App\Http\Resources\UserResource;
@@ -16,12 +16,12 @@ use App\Models\FarmNotification;
 use App\Models\LoginOtp;
 use App\Models\User;
 use App\Notifications\LoginOtpNotification;
-use App\Services\Auth\TokenIssuer;
 use App\Services\Auth\FirebaseIdTokenVerifier;
+use App\Services\Auth\TokenIssuer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\RateLimiter;
@@ -36,9 +36,7 @@ class AuthController extends Controller
     public function __construct(
         private readonly TokenIssuer $tokens,
         private readonly FirebaseIdTokenVerifier $firebaseTokens,
-    )
-    {
-    }
+    ) {}
 
     public function register(RegisterRequest $request): JsonResponse
     {
@@ -363,6 +361,36 @@ class AuthController extends Controller
         }
 
         return response()->json(['message' => 'If that email is registered, a reset link has been sent.']);
+    }
+
+    public function resetPassword(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'token' => ['required', 'string'],
+            'email' => ['required', 'email'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        $status = Password::reset($data, function (User $user, string $password): void {
+            DB::transaction(function () use ($user, $password): void {
+                $user->forceFill([
+                    'password' => $password,
+                    'remember_token' => Str::random(60),
+                ])->save();
+                $user->tokens()->delete();
+                $user->refreshTokens()->update(['revoked_at' => now()]);
+            });
+        });
+
+        if ($status !== Password::PASSWORD_RESET) {
+            throw ValidationException::withMessages([
+                'email' => [__($status)],
+            ]);
+        }
+
+        return response()->json([
+            'message' => 'Your password has been updated. You can now sign in to Pig World Smart.',
+        ]);
     }
 
     private function maskedEmail(string $email): string
