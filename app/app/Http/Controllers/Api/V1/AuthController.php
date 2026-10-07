@@ -24,6 +24,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Laravel\Sanctum\PersonalAccessToken;
@@ -292,6 +293,23 @@ class AuthController extends Controller
         $request->user()->update($data);
 
         return response()->json(['user' => new UserResource($request->user()->fresh())]);
+    }
+
+    public function updateProfileAvatar(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'avatar' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+        ]);
+
+        $user = $request->user();
+        $path = $data['avatar']->storePublicly('profile-avatars', 'public');
+        $oldPath = $user->avatar_path;
+        $user->update(['avatar_path' => $path]);
+        if ($oldPath !== null) {
+            Storage::disk('public')->delete($oldPath);
+        }
+
+        return response()->json(['user' => new UserResource($user->fresh())]);
     }
 
     public function changePassword(Request $request): JsonResponse

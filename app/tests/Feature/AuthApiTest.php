@@ -7,9 +7,11 @@ use App\Models\RefreshToken;
 use App\Models\User;
 use App\Notifications\LoginOtpNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class AuthApiTest extends TestCase
@@ -65,6 +67,28 @@ class AuthApiTest extends TestCase
             ->assertJsonPath('farms.0.name', 'Mobile Farm')
             ->assertJsonPath('farms.0.mother_pig_count', 12)
             ->assertJsonPath('farms.0.pregnant_pig_count', 4);
+    }
+
+    public function test_authenticated_user_can_upload_a_persisted_profile_avatar(): void
+    {
+        Storage::fake('public');
+        $user = User::factory()->create();
+
+        $upload = $this->actingAs($user, 'sanctum')
+            ->post('/api/v1/auth/profile/avatar', [
+                'avatar' => UploadedFile::fake()->create('profile.png', 10, 'image/png'),
+            ])
+            ->assertOk()
+            ->assertJsonPath('user.id', (string) $user->id);
+        $this->assertStringContainsString('/storage/profile-avatars/', $upload->json('user.avatar_url'));
+
+        $user->refresh();
+        $this->assertNotNull($user->avatar_path);
+        Storage::disk('public')->assertExists($user->avatar_path);
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/auth/me')
+            ->assertOk()
+            ->assertJsonPath('user.avatar_url', Storage::disk('public')->url($user->avatar_path));
     }
 
     public function test_registration_schema_repair_migration_restores_columns_missing_from_a_partial_deployment(): void

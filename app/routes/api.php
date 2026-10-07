@@ -54,6 +54,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/auth/logout', [AuthController::class, 'logout']);
         Route::get('/auth/me', [AuthController::class, 'me']);
         Route::patch('/auth/profile', [AuthController::class, 'updateProfile']);
+        Route::post('/auth/profile/avatar', [AuthController::class, 'updateProfileAvatar']);
         Route::post('/auth/change-password', [AuthController::class, 'changePassword']);
         Route::get('/auth/join-requests', [FarmJoinRequestController::class, 'mine']);
         Route::post('farms', [FarmController::class, 'store']);
