@@ -23,6 +23,17 @@ The tester account is not created in production. The Compose startup command
 also skips the database seeder when `APP_ENV=production`; production data must
 be created through an explicitly reviewed migration or administrative process.
 
+### M-Pesa Daraja configuration
+
+For production, set `MPESA_ENV=production` and obtain the consumer key, consumer
+secret, business shortcode, passkey, and transaction type from the same
+production Daraja app. Use `CustomerPayBillOnline` for a PayBill shortcode or
+`CustomerBuyGoodsOnline` for a Till shortcode. The shortcode is sent as both
+`BusinessShortCode` and `PartyB`; the STK password is Base64 of the exact
+concatenation `BusinessShortCode + passkey + Timestamp`. Never log or share the
+consumer credentials or passkey. After updating the server `.env`, rebuild the
+Laravel config cache.
+
 To seed the account manually after the stack is already running:
 
 ```bash

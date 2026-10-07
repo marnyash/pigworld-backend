@@ -7,6 +7,7 @@ use App\Models\Payment;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -16,6 +17,7 @@ class MpesaPaymentApiTest extends TestCase
 
     public function test_owner_can_start_a_herd_based_mpesa_payment(): void
     {
+        Carbon::setTestNow('2026-10-07 09:00:00');
         Http::fake([
             'sandbox.safaricom.co.ke/oauth/*' => Http::response(['access_token' => 'access-token']),
             'sandbox.safaricom.co.ke/mpesa/*' => Http::response([
@@ -47,8 +49,82 @@ class MpesaPaymentApiTest extends TestCase
             ->assertJsonPath('payment.amount', '500.00');
 
         Http::assertSent(fn ($request) => $request->url() === 'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest'
+            && $request['BusinessShortCode'] === '174379'
+            && $request['PartyB'] === '174379'
+            && $request['Timestamp'] === '20261007090000'
+            && $request['Password'] === base64_encode('174379passkey20261007090000')
+            && $request['TransactionType'] === 'CustomerPayBillOnline'
             && $request['Amount'] === 500
             && $request['PhoneNumber'] === '254712345678');
+        Carbon::setTestNow();
+    }
+
+    public function test_till_shortcode_uses_the_buy_goods_transaction_type(): void
+    {
+        Http::fake([
+            'sandbox.safaricom.co.ke/oauth/*' => Http::response(['access_token' => 'access-token']),
+            'sandbox.safaricom.co.ke/mpesa/*' => Http::response([
+                'ResponseCode' => '0',
+                'MerchantRequestID' => 'merchant-buy-goods',
+                'CheckoutRequestID' => 'checkout-buy-goods',
+            ]),
+        ]);
+        $user = User::factory()->create(['role' => 'farmOwner', 'phone' => '254712345678']);
+        $farm = Farm::create(['name' => 'Till Farm', 'mother_pig_count' => 5]);
+        $user->farms()->attach($farm);
+        SubscriptionPlan::create([
+            'code' => 'starter', 'name' => 'Starter', 'amount' => 500,
+            'currency' => 'KES', 'pig_limit' => 50, 'active' => true,
+        ]);
+        config(['services.mpesa' => [
+            'environment' => 'sandbox',
+            'consumer_key' => 'key',
+            'consumer_secret' => 'secret',
+            'shortcode' => '600000',
+            'passkey' => 'passkey',
+            'transaction_type' => 'CustomerBuyGoodsOnline',
+            'callback_url' => 'https://payments.example.com/api/v1/payments/mpesa/callback',
+        ]]);
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson("/api/v1/farms/{$farm->id}/subscription/payment", ['plan' => 'starter'])
+            ->assertCreated();
+
+        Http::assertSent(fn ($request) => str_ends_with($request->url(), '/mpesa/stkpush/v1/processrequest')
+            && $request['BusinessShortCode'] === '600000'
+            && $request['PartyB'] === '600000'
+            && $request['TransactionType'] === 'CustomerBuyGoodsOnline'
+            && $request['Password'] === base64_encode(
+                '600000passkey'.now()->format('YmdHis'),
+            ));
+    }
+
+    public function test_invalid_shortcode_is_rejected_before_contacting_safaricom(): void
+    {
+        Http::fake();
+        $user = User::factory()->create(['role' => 'farmOwner', 'phone' => '254712345678']);
+        $farm = Farm::create(['name' => 'Invalid Config Farm', 'mother_pig_count' => 5]);
+        $user->farms()->attach($farm);
+        SubscriptionPlan::create([
+            'code' => 'starter', 'name' => 'Starter', 'amount' => 500,
+            'currency' => 'KES', 'pig_limit' => 50, 'active' => true,
+        ]);
+        config(['services.mpesa' => [
+            'environment' => 'sandbox',
+            'consumer_key' => 'key',
+            'consumer_secret' => 'secret',
+            'shortcode' => '17 4379',
+            'passkey' => 'passkey',
+            'transaction_type' => 'CustomerPayBillOnline',
+            'callback_url' => 'https://payments.example.com/api/v1/payments/mpesa/callback',
+        ]]);
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson("/api/v1/farms/{$farm->id}/subscription/payment", ['plan' => 'starter'])
+            ->assertStatus(503)
+            ->assertJsonPath('error', 'mpesa_configuration_error');
+
+        Http::assertNothingSent();
     }
 
     public function test_payment_normalizes_a_kenyan_phone_number_before_sending_the_stk_push(): void

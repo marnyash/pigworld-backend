@@ -18,9 +18,10 @@ class MpesaService
             : 'https://sandbox.safaricom.co.ke';
         $key = config('services.mpesa.consumer_key');
         $secret = config('services.mpesa.consumer_secret');
-        $shortcode = config('services.mpesa.shortcode');
+        $shortcode = trim((string) config('services.mpesa.shortcode', ''));
         $passkey = config('services.mpesa.passkey');
         $callbackUrl = config('services.mpesa.callback_url');
+        $transactionType = config('services.mpesa.transaction_type', 'CustomerPayBillOnline');
 
         if (! in_array($environment, ['sandbox', 'production'], true)) {
             throw new RuntimeException('M-Pesa environment must be sandbox or production.');
@@ -28,6 +29,14 @@ class MpesaService
 
         if (! $key || ! $secret || ! $shortcode || ! $passkey || ! $callbackUrl) {
             throw new RuntimeException('M-Pesa is not configured.');
+        }
+
+        if (! preg_match('/^\d+$/', $shortcode)) {
+            throw new RuntimeException('M-Pesa business shortcode must contain digits only.');
+        }
+
+        if (! in_array($transactionType, ['CustomerPayBillOnline', 'CustomerBuyGoodsOnline'], true)) {
+            throw new RuntimeException('M-Pesa transaction type must match the business shortcode.');
         }
 
         $this->validateCallbackUrl($callbackUrl);
@@ -47,7 +56,7 @@ class MpesaService
                 'BusinessShortCode' => $shortcode,
                 'Password' => base64_encode($shortcode.$passkey.$timestamp),
                 'Timestamp' => $timestamp,
-                'TransactionType' => 'CustomerPayBillOnline',
+                'TransactionType' => $transactionType,
                 'Amount' => (int) ceil((float) $payment->amount),
                 'PartyA' => $payment->phone,
                 'PartyB' => $shortcode,
