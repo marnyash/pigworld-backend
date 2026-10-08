@@ -74,6 +74,10 @@ class AuthController extends Controller
                 ]);
             }
 
+            if ($role === 'buyer') {
+                $user->buyer()->firstOrCreate([]);
+            }
+
             $farm = $role === 'farmOwner'
                 ? Farm::create([
                     'name' => $data['farm_name'],

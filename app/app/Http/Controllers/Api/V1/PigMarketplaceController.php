@@ -6,13 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Marketplace\StorePigInquiryRequest;
 use App\Http\Requests\Marketplace\StorePigListingRequest;
 use App\Models\Animal;
+use App\Models\Buyer;
 use App\Models\Farm;
 use App\Models\PigInquiry;
 use App\Models\PigListing;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class PigMarketplaceController extends Controller
@@ -48,14 +49,20 @@ class PigMarketplaceController extends Controller
     {
         abort_unless($request->user()?->role === 'buyer', 403, 'Only buyer accounts can send authenticated requests.');
 
-        return $this->createInquiry($request, $listing, $request->user()->id);
+        $buyer = $request->user()->buyer()->firstOrCreate([]);
+
+        return $this->createInquiry($request, $listing, $buyer);
     }
 
     public function buyerDeliveries(Request $request): JsonResponse
     {
         abort_unless($request->user()?->role === 'buyer', 403, 'Only buyer accounts can view buyer requests.');
+        $buyer = $request->user()->buyer()->firstOrCreate([]);
         $inquiries = PigInquiry::query()
-            ->where('buyer_user_id', $request->user()->id)
+            ->where(function ($query) use ($buyer, $request): void {
+                $query->where('buyer_id', $buyer->id)
+                    ->orWhere('buyer_user_id', $request->user()->id);
+            })
             ->with(['listing.farm:id,name,location'])
             ->latest()
             ->limit(200)
@@ -66,7 +73,7 @@ class PigMarketplaceController extends Controller
         ]);
     }
 
-    private function createInquiry(StorePigInquiryRequest $request, PigListing $listing, ?int $buyerUserId = null): JsonResponse
+    private function createInquiry(StorePigInquiryRequest $request, PigListing $listing, ?Buyer $buyer = null): JsonResponse
     {
         abort_unless($listing->status === 'available' && $listing->quantity > 0, 404);
         if ($request->integer('quantity') > $listing->quantity) {
@@ -75,7 +82,8 @@ class PigMarketplaceController extends Controller
             ]);
         }
         $inquiry = $listing->inquiries()->create($request->validated() + [
-            'buyer_user_id' => $buyerUserId,
+            'buyer_id' => $buyer?->id,
+            'buyer_user_id' => $buyer?->user_id,
         ]);
         $inquiry->refresh();
 
@@ -104,17 +112,22 @@ class PigMarketplaceController extends Controller
     {
         $this->authorizeFarmSales($request, $farm, write: true);
         $data = $request->validated();
-        if (isset($data['animal_id'])) {
-            $animal = Animal::query()
-                ->where('farm_id', $farm->id)
-                ->findOrFail($data['animal_id']);
-            abort_unless($animal->status === 'active', 422, 'Only active pigs can be posted.');
-            $alreadyPosted = $farm->pigListings()
-                ->where('animal_id', $animal->id)
-                ->where('status', 'available')
-                ->exists();
-            abort_if($alreadyPosted, 422, 'This pig already has an active listing.');
+        $animal = Animal::query()
+            ->where('farm_id', $farm->id)
+            ->findOrFail($data['animal_id']);
+        abort_unless($animal->status === 'active', 422, 'Only active pigs can be posted.');
+        abort_unless($animal->image_path !== null, 422, 'Add a photo to this pig in Herd before posting it.');
+        if (($data['weight_kg'] ?? null) === null && $animal->weight_kg === null) {
+            throw ValidationException::withMessages([
+                'weight_kg' => ['Add the pig weight in Herd or enter its weight in the listing.'],
+            ]);
         }
+        $data['weight_kg'] ??= $animal->weight_kg;
+        $alreadyPosted = $farm->pigListings()
+            ->where('animal_id', $animal->id)
+            ->where('status', 'available')
+            ->exists();
+        abort_if($alreadyPosted, 422, 'This pig already has an active listing.');
         $listing = $farm->pigListings()->create($data + [
             'created_by' => $request->user()->id,
             'location' => $request->validated('location') ?: $farm->location,
@@ -181,7 +194,6 @@ class PigMarketplaceController extends Controller
         $data = [
             'id' => (string) $listing->id,
             'animal_id' => $listing->animal_id === null ? null : (string) $listing->animal_id,
-            'animal_id' => $listing->animal_id === null ? null : (string) $listing->animal_id,
             'image_url' => $listing->animal?->image_path === null
                 ? null
                 : Storage::disk('public')->url($listing->animal->image_path),
@@ -191,7 +203,7 @@ class PigMarketplaceController extends Controller
             'title' => $listing->title,
             'breed' => $listing->breed,
             'age_weeks' => $listing->age_weeks,
-            'weight_kg' => $listing->weight_kg,
+            'weight_kg' => $listing->weight_kg ?? $listing->animal?->weight_kg,
             'quantity' => $listing->quantity,
             'price_per_pig' => $listing->price_per_pig,
             'currency' => $listing->currency,

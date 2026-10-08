@@ -11,6 +11,7 @@ class PigInquiry extends Model
     use HasFactory;
 
     protected $fillable = [
+        'buyer_id',
         'buyer_user_id',
         'buyer_name',
         'phone',
@@ -32,6 +33,6 @@ class PigInquiry extends Model
 
     public function buyer(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'buyer_user_id');
+        return $this->belongsTo(Buyer::class);
     }
 }

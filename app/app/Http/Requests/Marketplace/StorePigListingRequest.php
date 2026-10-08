@@ -16,7 +16,7 @@ class StorePigListingRequest extends FormRequest
     {
         return [
             'title' => ['required', 'string', 'max:120'],
-            'animal_id' => ['nullable', 'integer', 'exists:animals,id'],
+            'animal_id' => ['required', 'integer', 'exists:animals,id'],
             'breed' => ['required', 'string', 'max:100'],
             'age_weeks' => ['nullable', 'integer', 'min:1', 'max:156'],
             'weight_kg' => ['nullable', 'numeric', 'gt:0', 'max:1000'],

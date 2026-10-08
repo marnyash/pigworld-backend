@@ -59,6 +59,38 @@ class HerdApiTest extends TestCase
             ->assertJsonValidationErrors(['type', 'sex']);
     }
 
+    public function test_farm_owner_can_create_an_animal_with_profile_details(): void
+    {
+        $user = User::factory()->create(['role' => 'farmOwner']);
+        $farm = Farm::create(['name' => 'Test farm']);
+        $farm->users()->attach($user);
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson("/api/v1/farms/{$farm->id}/animals", [
+                'tag' => 'SOW-NEW',
+                'name' => 'Daisy',
+                'type' => 'sow',
+                'sex' => 'female',
+                'status' => 'active',
+                'is_pregnant' => true,
+                'weight_kg' => 125.5,
+                'birth_date' => '2023-04-12',
+                'last_dewormed_at' => '2026-09-01',
+                'last_vaccinated_at' => '2026-08-15',
+                'notes' => 'First litter expected soon',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.tag', 'SOW-NEW')
+            ->assertJsonPath('data.name', 'Daisy')
+            ->assertJsonPath('data.status', 'active')
+            ->assertJsonPath('data.is_pregnant', true)
+            ->assertJsonPath('data.weight_kg', 125.5)
+            ->assertJsonPath('data.birth_date', '2023-04-12')
+            ->assertJsonPath('data.last_dewormed_at', '2026-09-01')
+            ->assertJsonPath('data.last_vaccinated_at', '2026-08-15')
+            ->assertJsonPath('data.notes', 'First litter expected soon');
+    }
+
     public function test_farm_owner_can_replace_an_animal_photo(): void
     {
         Storage::fake('public');

@@ -76,6 +76,28 @@ class AuthApiTest extends TestCase
             ->assertJsonPath('farms.0.pregnant_pig_count', 4);
     }
 
+    public function test_buyer_can_register_and_complete_otp_login(): void
+    {
+        Notification::fake();
+        $registration = $this->postJson('/api/v1/auth/register', [
+            'name' => 'Marketplace Buyer',
+            'email' => 'buyer-login@example.com',
+            'phone' => '+254700000888',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+            'role' => 'buyer',
+        ])->assertOk()->assertJsonPath('user.role', 'buyer');
+
+        $buyer = User::findOrFail($registration->json('user.id'));
+        $this->assertDatabaseHas('buyers', ['user_id' => $buyer->id]);
+
+        $challenge = $this->beginOtpLogin($buyer->email, 'password123');
+        $this->verifyOtpLogin($challenge, $buyer)
+            ->assertOk()
+            ->assertJsonPath('user.id', (string) $buyer->id)
+            ->assertJsonPath('user.role', 'buyer');
+    }
+
     public function test_new_invited_farm_member_receives_a_personal_welcome_notification(): void
     {
         $farm = Farm::create(['name' => 'Invite Farm']);

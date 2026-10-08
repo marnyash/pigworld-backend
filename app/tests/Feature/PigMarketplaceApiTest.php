@@ -15,10 +15,24 @@ class PigMarketplaceApiTest extends TestCase
 
     public function test_farm_can_publish_listing_and_review_buyer_requests(): void
     {
+        Storage::fake('public');
         [$owner, $farm] = $this->farmWithOwner();
+        $imagePath = UploadedFile::fake()
+            ->create('pig.jpg', 10, 'image/jpeg')
+            ->store("animal-images/{$farm->id}", 'public');
+        $animal = $farm->animals()->create([
+            'created_by' => $owner->id,
+            'tag' => 'PIG-010',
+            'type' => 'weaner',
+            'sex' => 'female',
+            'status' => 'active',
+            'weight_kg' => 18.5,
+            'image_path' => $imagePath,
+        ]);
 
         $listingId = $this->actingAs($owner, 'sanctum')
             ->postJson("/api/v1/farms/{$farm->id}/pig-listings", [
+                'animal_id' => $animal->id,
                 'title' => 'Healthy weaners',
                 'breed' => 'Large White',
                 'age_weeks' => 10,
@@ -31,6 +45,8 @@ class PigMarketplaceApiTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('data.status', 'available')
             ->assertJsonPath('data.farm_name', 'Marketplace farm')
+            ->assertJsonPath('data.image_url', Storage::disk('public')->url($imagePath))
+            ->assertJsonPath('data.weight_kg', '18.50')
             ->json('data.id');
 
         $this->postJson("/api/v1/marketplace/pigs/{$listingId}/inquiries", [
@@ -54,6 +70,10 @@ class PigMarketplaceApiTest extends TestCase
         $this->getJson('/api/v1/marketplace/pigs')
             ->assertOk()
             ->assertJsonPath('data.0.id', (string) $listingId)
+            ->assertJsonPath('data.0.farm_name', 'Marketplace farm')
+            ->assertJsonPath('data.0.price_per_pig', '18000.00')
+            ->assertJsonPath('data.0.weight_kg', '18.50')
+            ->assertJsonPath('data.0.image_url', Storage::disk('public')->url($imagePath))
             ->assertJsonPath('data.0.inquiries', null);
 
         $this->actingAs($owner, 'sanctum')
@@ -141,6 +161,7 @@ class PigMarketplaceApiTest extends TestCase
             ->assertJsonPath('farms', [])
             ->json('user.id');
 
+        $this->assertDatabaseHas('buyers', ['user_id' => $buyerId]);
         $buyer = User::findOrFail($buyerId);
         $this->postJson("/api/v1/marketplace/pigs/{$listing->id}/buyer-inquiries", [
             'buyer_name' => $buyer->name,
@@ -166,6 +187,12 @@ class PigMarketplaceApiTest extends TestCase
             ])
             ->assertCreated()
             ->json('data.id');
+
+        $this->assertDatabaseHas('pig_inquiries', [
+            'id' => $inquiryId,
+            'buyer_id' => $buyer->buyer->id,
+            'buyer_user_id' => $buyer->id,
+        ]);
 
         $this->actingAs($owner, 'sanctum')
             ->patchJson("/api/v1/farms/{$farm->id}/pig-listings/{$listing->id}/inquiries/{$inquiryId}", [
@@ -208,7 +235,6 @@ class PigMarketplaceApiTest extends TestCase
                 'animal_id' => $animal->id,
                 'title' => $animal->tag,
                 'breed' => 'sow (female)',
-                'weight_kg' => $animal->weight_kg,
                 'quantity' => 1,
                 'price_per_pig' => 25000,
                 'currency' => 'KES',
@@ -219,12 +245,14 @@ class PigMarketplaceApiTest extends TestCase
                 'data.image_url',
                 Storage::disk('public')->url($imagePath),
             )
+            ->assertJsonPath('data.weight_kg', '72.50')
             ->json('data.id');
 
         $this->getJson('/api/v1/marketplace/pigs')
             ->assertOk()
             ->assertJsonPath('data.0.id', (string) $listingId)
-            ->assertJsonPath('data.0.image_url', Storage::disk('public')->url($imagePath));
+            ->assertJsonPath('data.0.image_url', Storage::disk('public')->url($imagePath))
+            ->assertJsonPath('data.0.weight_kg', '72.50');
 
         $this->actingAs($owner, 'sanctum')
             ->postJson("/api/v1/farms/{$farm->id}/pig-listings", [

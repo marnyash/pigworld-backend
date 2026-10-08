@@ -3,12 +3,13 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Database\Factories\UserFactory;
 use App\Notifications\PasswordResetNotification;
+use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -24,6 +25,11 @@ class User extends Authenticatable
     public function farms(): BelongsToMany
     {
         return $this->belongsToMany(Farm::class)->withPivot(['permissions', 'role'])->withTimestamps();
+    }
+
+    public function buyer(): HasOne
+    {
+        return $this->hasOne(Buyer::class);
     }
 
     /** @return \Illuminate\Database\Eloquent\Relations\HasMany<FarmJoinRequest, User> */
