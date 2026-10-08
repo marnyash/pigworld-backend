@@ -9,9 +9,11 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Collection;
 use Laravel\Sanctum\HasApiTokens;
 
 #[Fillable(['name', 'email', 'phone', 'password', 'role', 'crm_role', 'crm_closed_at', 'avatar_path'])]
@@ -32,14 +34,14 @@ class User extends Authenticatable
         return $this->hasOne(Buyer::class);
     }
 
-    /** @return \Illuminate\Database\Eloquent\Relations\HasMany<FarmJoinRequest, User> */
-    public function farmJoinRequests(): \Illuminate\Database\Eloquent\Relations\HasMany
+    /** @return HasMany<FarmJoinRequest, User> */
+    public function farmJoinRequests(): HasMany
     {
         return $this->hasMany(FarmJoinRequest::class);
     }
 
-    /** @return \Illuminate\Database\Eloquent\Relations\HasMany<RefreshToken, User> */
-    public function refreshTokens(): \Illuminate\Database\Eloquent\Relations\HasMany
+    /** @return HasMany<RefreshToken, User> */
+    public function refreshTokens(): HasMany
     {
         return $this->hasMany(RefreshToken::class);
     }
@@ -48,7 +50,7 @@ class User extends Authenticatable
      * Backward-compatible accessor for legacy code that still expects a user-level
      * farm-members collection.
      *
-     * @return \Illuminate\Support\Collection<int, User>
+     * @return Collection<int, User>
      */
     public function farmMembers()
     {

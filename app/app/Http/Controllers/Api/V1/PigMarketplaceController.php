@@ -183,7 +183,7 @@ class PigMarketplaceController extends Controller
                 'accountant' => ['viewSales'],
                 default => [],
             }
-            : json_decode($membership->pivot->permissions, true);
+        : json_decode($membership->pivot->permissions, true);
         $canManage = in_array('manageSales', $permissions ?? [], true);
         $canView = $canManage || in_array('viewSales', $permissions ?? [], true);
         abort_unless($write ? $canManage : $canView, 403);

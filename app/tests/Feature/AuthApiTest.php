@@ -6,12 +6,13 @@ use App\Models\Farm;
 use App\Models\RefreshToken;
 use App\Models\User;
 use App\Notifications\LoginOtpNotification;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 class AuthApiTest extends TestCase
@@ -357,7 +358,7 @@ class AuthApiTest extends TestCase
         ])->assertUnprocessable()->assertJsonValidationErrors('code');
     }
 
-    private function beginOtpLogin(string $identifier, string $password): \Illuminate\Testing\TestResponse
+    private function beginOtpLogin(string $identifier, string $password): TestResponse
     {
         return $this->postJson('/api/v1/auth/login', [
             'identifier' => $identifier,
@@ -366,7 +367,7 @@ class AuthApiTest extends TestCase
         ])->assertOk()->assertJsonPath('otp_required', true);
     }
 
-    private function verifyOtpLogin(\Illuminate\Testing\TestResponse $challenge, User $user): \Illuminate\Testing\TestResponse
+    private function verifyOtpLogin(TestResponse $challenge, User $user): TestResponse
     {
         return $this->postJson('/api/v1/auth/verify-otp', [
             'challenge_id' => $challenge->json('challenge_id'),
@@ -379,6 +380,7 @@ class AuthApiTest extends TestCase
         $code = null;
         Notification::assertSentTo($user, LoginOtpNotification::class, function (LoginOtpNotification $notification) use (&$code, $user): bool {
             $code = $notification->toMail($user)->introLines[1] ?? null;
+
             return is_string($code) && preg_match('/^\d{6}$/', $code) === 1;
         });
 
