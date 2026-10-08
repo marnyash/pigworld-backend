@@ -88,4 +88,37 @@ class HerdApiTest extends TestCase
         Storage::disk('public')->assertExists($animal->image_path);
         $this->assertStringContainsString('/storage/animal-images/', $response->json('data.image_url'));
     }
+
+    public function test_farm_owner_can_update_animal_profile_details(): void
+    {
+        $user = User::factory()->create(['role' => 'farmOwner']);
+        $farm = Farm::create(['name' => 'Test farm']);
+        $farm->users()->attach($user);
+        $animal = $farm->animals()->create([
+            'created_by' => $user->id,
+            'tag' => 'APP-PIG-1',
+            'type' => 'sow',
+            'sex' => 'female',
+        ]);
+
+        $this->actingAs($user, 'sanctum')
+            ->patchJson("/api/v1/farms/{$farm->id}/animals/{$animal->id}", [
+                'name' => 'Daisy',
+                'sex' => 'female',
+                'is_pregnant' => true,
+                'weight_kg' => 125.5,
+                'birth_date' => '2023-04-12',
+                'last_dewormed_at' => '2026-09-01',
+                'last_vaccinated_at' => '2026-08-15',
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.tag', 'APP-PIG-1')
+            ->assertJsonPath('data.name', 'Daisy')
+            ->assertJsonPath('data.sex', 'female')
+            ->assertJsonPath('data.is_pregnant', true)
+            ->assertJsonPath('data.weight_kg', 125.5)
+            ->assertJsonPath('data.birth_date', '2023-04-12')
+            ->assertJsonPath('data.last_dewormed_at', '2026-09-01')
+            ->assertJsonPath('data.last_vaccinated_at', '2026-08-15');
+    }
 }

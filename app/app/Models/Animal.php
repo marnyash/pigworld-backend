@@ -15,18 +15,27 @@ class Animal extends Model
         'farm_id',
         'created_by',
         'tag',
+        'name',
         'type',
         'sex',
         'status',
         'birth_date',
         'weight_kg',
+        'is_pregnant',
+        'last_dewormed_at',
+        'last_vaccinated_at',
         'notes',
         'image_path',
     ];
 
     protected function casts(): array
     {
-        return ['birth_date' => 'date'];
+        return [
+            'birth_date' => 'date',
+            'is_pregnant' => 'boolean',
+            'last_dewormed_at' => 'date',
+            'last_vaccinated_at' => 'date',
+        ];
     }
 
     /** @return BelongsTo<Farm, Animal> */
