@@ -142,6 +142,8 @@ class PigMarketplaceApiTest extends TestCase
         $listing = $farm->pigListings()->create([
             'title' => 'Delivery pig',
             'breed' => 'Large White',
+            'age_weeks' => 16,
+            'weight_kg' => 95.5,
             'quantity' => 3,
             'price_per_pig' => 21000,
             'currency' => 'KES',
@@ -205,7 +207,9 @@ class PigMarketplaceApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.0.id', (string) $inquiryId)
             ->assertJsonPath('data.0.status', 'accepted')
-            ->assertJsonPath('data.0.listing.farm_name', 'Marketplace farm');
+            ->assertJsonPath('data.0.listing.farm_name', 'Marketplace farm')
+            ->assertJsonPath('data.0.listing.age_weeks', 16)
+            ->assertJsonPath('data.0.listing.weight_kg', '95.50');
 
         $this->actingAs(User::factory()->create(['role' => 'buyer']), 'sanctum')
             ->getJson('/api/v1/marketplace/buyer/deliveries')

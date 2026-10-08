@@ -243,8 +243,13 @@ class PigMarketplaceController extends Controller
                 'id' => (string) $listing->id,
                 'title' => $listing->title,
                 'breed' => $listing->breed,
+                'age_weeks' => $listing->age_weeks,
+                'weight_kg' => $listing->weight_kg ?? $listing->animal?->weight_kg,
                 'price_per_pig' => $listing->price_per_pig,
                 'currency' => $listing->currency,
+                'image_url' => $listing->animal?->image_path === null
+                    ? null
+                    : Storage::disk('public')->url($listing->animal->image_path),
                 'location' => $listing->location,
                 'farm_name' => $listing->farm?->name,
                 'farm_location' => $listing->farm?->location,
