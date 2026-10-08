@@ -5,12 +5,14 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Marketplace\StorePigInquiryRequest;
 use App\Http\Requests\Marketplace\StorePigListingRequest;
+use App\Models\Animal;
 use App\Models\Farm;
 use App\Models\PigInquiry;
 use App\Models\PigListing;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 class PigMarketplaceController extends Controller
@@ -20,7 +22,7 @@ class PigMarketplaceController extends Controller
         $listings = PigListing::query()
             ->where('status', 'available')
             ->where('quantity', '>', 0)
-            ->with('farm:id,name,location')
+            ->with(['farm:id,name,location', 'animal'])
             ->when($request->filled('search'), function ($query) use ($request) {
                 $term = $request->string('search')->toString();
                 $query->where(fn ($listings) => $listings
@@ -61,7 +63,7 @@ class PigMarketplaceController extends Controller
     {
         $this->authorizeFarmSales($request, $farm);
         $listings = $farm->pigListings()
-            ->with(['farm:id,name,location', 'inquiries' => fn ($query) => $query->latest()])
+            ->with(['farm:id,name,location', 'animal', 'inquiries' => fn ($query) => $query->latest()])
             ->latest()
             ->limit(100)
             ->get();
@@ -72,13 +74,25 @@ class PigMarketplaceController extends Controller
     public function store(StorePigListingRequest $request, Farm $farm): JsonResponse
     {
         $this->authorizeFarmSales($request, $farm, write: true);
-        $listing = $farm->pigListings()->create($request->validated() + [
+        $data = $request->validated();
+        if (isset($data['animal_id'])) {
+            $animal = Animal::query()
+                ->where('farm_id', $farm->id)
+                ->findOrFail($data['animal_id']);
+            abort_unless($animal->status === 'active', 422, 'Only active pigs can be posted.');
+            $alreadyPosted = $farm->pigListings()
+                ->where('animal_id', $animal->id)
+                ->where('status', 'available')
+                ->exists();
+            abort_if($alreadyPosted, 422, 'This pig already has an active listing.');
+        }
+        $listing = $farm->pigListings()->create($data + [
             'created_by' => $request->user()->id,
             'location' => $request->validated('location') ?: $farm->location,
         ]);
 
         return response()->json([
-            'data' => $this->listingData($listing->fresh()->load('farm:id,name,location'), true),
+            'data' => $this->listingData($listing->fresh()->load(['farm:id,name,location', 'animal']), true),
         ], 201);
     }
 
@@ -89,7 +103,7 @@ class PigMarketplaceController extends Controller
         $data = $request->validate(['status' => ['required', Rule::in(['available', 'unavailable', 'sold'])]]);
         $listing->update($data);
 
-        return response()->json(['data' => $this->listingData($listing->fresh()->load(['farm:id,name,location', 'inquiries']), true)]);
+        return response()->json(['data' => $this->listingData($listing->fresh()->load(['farm:id,name,location', 'animal', 'inquiries']), true)]);
     }
 
     public function updateInquiryStatus(Request $request, Farm $farm, PigListing $listing, PigInquiry $inquiry): JsonResponse
@@ -137,6 +151,11 @@ class PigMarketplaceController extends Controller
     {
         $data = [
             'id' => (string) $listing->id,
+            'animal_id' => $listing->animal_id === null ? null : (string) $listing->animal_id,
+            'animal_id' => $listing->animal_id === null ? null : (string) $listing->animal_id,
+            'image_url' => $listing->animal?->image_path === null
+                ? null
+                : Storage::disk('public')->url($listing->animal->image_path),
             'farm_id' => (string) $listing->farm_id,
             'farm_name' => $listing->farm?->name,
             'farm_location' => $listing->farm?->location,

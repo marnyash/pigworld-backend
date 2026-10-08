@@ -19,6 +19,7 @@ class Animal extends Model
         'sex',
         'status',
         'birth_date',
+        'weight_kg',
         'notes',
         'image_path',
     ];
@@ -44,5 +45,11 @@ class Animal extends Model
     public function pregnancies(): HasMany
     {
         return $this->hasMany(Pregnancy::class, 'sow_id');
+    }
+
+    /** @return HasMany<PigListing> */
+    public function pigListings(): HasMany
+    {
+        return $this->hasMany(PigListing::class);
     }
 }

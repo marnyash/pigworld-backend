@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Models\Farm;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class PigMarketplaceApiTest extends TestCase
@@ -112,6 +114,58 @@ class PigMarketplaceApiTest extends TestCase
             'price_per_pig' => 1,
             'currency' => 'KES',
         ])->assertMethodNotAllowed();
+    }
+
+    public function test_listing_for_a_herd_animal_exposes_its_saved_photo_to_buyers(): void
+    {
+        Storage::fake('public');
+        [$owner, $farm] = $this->farmWithOwner();
+        $imagePath = UploadedFile::fake()
+            ->create('pig.jpg', 10, 'image/jpeg')
+            ->store("animal-images/{$farm->id}", 'public');
+        $animal = $farm->animals()->create([
+            'created_by' => $owner->id,
+            'tag' => 'PIG-001',
+            'type' => 'sow',
+            'sex' => 'female',
+            'status' => 'active',
+            'weight_kg' => 72.5,
+            'image_path' => $imagePath,
+        ]);
+
+        $listingId = $this->actingAs($owner, 'sanctum')
+            ->postJson("/api/v1/farms/{$farm->id}/pig-listings", [
+                'animal_id' => $animal->id,
+                'title' => $animal->tag,
+                'breed' => 'sow (female)',
+                'weight_kg' => $animal->weight_kg,
+                'quantity' => 1,
+                'price_per_pig' => 25000,
+                'currency' => 'KES',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.animal_id', (string) $animal->id)
+            ->assertJsonPath(
+                'data.image_url',
+                Storage::disk('public')->url($imagePath),
+            )
+            ->json('data.id');
+
+        $this->getJson('/api/v1/marketplace/pigs')
+            ->assertOk()
+            ->assertJsonPath('data.0.id', (string) $listingId)
+            ->assertJsonPath('data.0.image_url', Storage::disk('public')->url($imagePath));
+
+        $this->actingAs($owner, 'sanctum')
+            ->postJson("/api/v1/farms/{$farm->id}/pig-listings", [
+                'animal_id' => $animal->id,
+                'title' => $animal->tag,
+                'breed' => 'sow (female)',
+                'quantity' => 1,
+                'price_per_pig' => 25000,
+                'currency' => 'KES',
+            ])
+            ->assertUnprocessable();
     }
 
     /** @return array{User, Farm} */

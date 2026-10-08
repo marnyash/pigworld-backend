@@ -13,6 +13,7 @@ class PigListing extends Model
 
     protected $fillable = [
         'farm_id',
+        'animal_id',
         'title',
         'breed',
         'age_weeks',
@@ -39,6 +40,11 @@ class PigListing extends Model
     public function farm(): BelongsTo
     {
         return $this->belongsTo(Farm::class);
+    }
+
+    public function animal(): BelongsTo
+    {
+        return $this->belongsTo(Animal::class);
     }
 
     public function inquiries(): HasMany

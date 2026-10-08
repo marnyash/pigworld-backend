@@ -19,6 +19,7 @@ class AnimalResource extends JsonResource
             'sex' => $this->sex,
             'status' => $this->status,
             'birth_date' => $this->birth_date?->toDateString(),
+            'weight_kg' => $this->weight_kg === null ? null : (float) $this->weight_kg,
             'notes' => $this->notes,
             'image_url' => $this->image_path === null
                 ? null

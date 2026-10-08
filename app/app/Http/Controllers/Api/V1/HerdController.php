@@ -62,7 +62,27 @@ class HerdController extends Controller
     {
         $this->authorizeHerdAccess($request, $farm);
         abort_if($animal->farm_id !== $farm->id, 404);
-        $animal->update($request->validated());
+        $data = $request->safe()->except(['image']);
+        $oldImagePath = $animal->image_path;
+        if ($request->hasFile('image')) {
+            $data['image_path'] = $request->file('image')->store(
+                "animal-images/{$farm->id}",
+                'public',
+            );
+        }
+
+        try {
+            $animal->update($data);
+        } catch (\Throwable $error) {
+            if (isset($data['image_path'])) {
+                Storage::disk('public')->delete($data['image_path']);
+            }
+            throw $error;
+        }
+
+        if (isset($data['image_path']) && $oldImagePath !== null) {
+            Storage::disk('public')->delete($oldImagePath);
+        }
 
         return response()->json(['data' => new AnimalResource($animal->fresh())]);
     }

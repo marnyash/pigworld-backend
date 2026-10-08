@@ -20,6 +20,7 @@ class StoreAnimalRequest extends FormRequest
             'sex' => ['required', Rule::in(['male', 'female', 'unknown'])],
             'status' => ['sometimes', Rule::in(['active', 'sold', 'deceased'])],
             'birth_date' => ['nullable', 'date'],
+            'weight_kg' => ['nullable', 'numeric', 'min:0', 'max:999999.99'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'image' => ['nullable', 'image', 'max:5120'],
         ];
