@@ -41,13 +41,42 @@ class PigMarketplaceController extends Controller
 
     public function inquire(StorePigInquiryRequest $request, PigListing $listing): JsonResponse
     {
+        return $this->createInquiry($request, $listing);
+    }
+
+    public function buyerInquire(StorePigInquiryRequest $request, PigListing $listing): JsonResponse
+    {
+        abort_unless($request->user()?->role === 'buyer', 403, 'Only buyer accounts can send authenticated requests.');
+
+        return $this->createInquiry($request, $listing, $request->user()->id);
+    }
+
+    public function buyerDeliveries(Request $request): JsonResponse
+    {
+        abort_unless($request->user()?->role === 'buyer', 403, 'Only buyer accounts can view buyer requests.');
+        $inquiries = PigInquiry::query()
+            ->where('buyer_user_id', $request->user()->id)
+            ->with(['listing.farm:id,name,location'])
+            ->latest()
+            ->limit(200)
+            ->get();
+
+        return response()->json([
+            'data' => $inquiries->map(fn (PigInquiry $inquiry) => $this->buyerDeliveryData($inquiry)),
+        ]);
+    }
+
+    private function createInquiry(StorePigInquiryRequest $request, PigListing $listing, ?int $buyerUserId = null): JsonResponse
+    {
         abort_unless($listing->status === 'available' && $listing->quantity > 0, 404);
         if ($request->integer('quantity') > $listing->quantity) {
             throw ValidationException::withMessages([
                 'quantity' => ['The requested quantity is greater than the number of pigs available.'],
             ]);
         }
-        $inquiry = $listing->inquiries()->create($request->validated());
+        $inquiry = $listing->inquiries()->create($request->validated() + [
+            'buyer_user_id' => $buyerUserId,
+        ]);
         $inquiry->refresh();
 
         return response()->json([
@@ -189,6 +218,25 @@ class PigMarketplaceController extends Controller
             'message' => $inquiry->message,
             'status' => $inquiry->status,
             'created_at' => $inquiry->created_at?->toIso8601String(),
+        ];
+    }
+
+    private function buyerDeliveryData(PigInquiry $inquiry): array
+    {
+        $listing = $inquiry->listing;
+
+        return [
+            ...$this->inquiryData($inquiry),
+            'listing' => $listing === null ? null : [
+                'id' => (string) $listing->id,
+                'title' => $listing->title,
+                'breed' => $listing->breed,
+                'price_per_pig' => $listing->price_per_pig,
+                'currency' => $listing->currency,
+                'location' => $listing->location,
+                'farm_name' => $listing->farm?->name,
+                'farm_location' => $listing->farm?->location,
+            ],
         ];
     }
 }

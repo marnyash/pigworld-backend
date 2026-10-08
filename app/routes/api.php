@@ -43,6 +43,7 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('v1')->group(function () {
     Route::get('marketplace/pigs', [PigMarketplaceController::class, 'browse'])->middleware('throttle:60,1');
     Route::post('marketplace/pigs/{listing}/inquiries', [PigMarketplaceController::class, 'inquire'])->middleware('throttle:10,1');
+    Route::post('marketplace/pigs/{listing}/buyer-inquiries', [PigMarketplaceController::class, 'buyerInquire'])->middleware(['auth:sanctum', 'throttle:10,1']);
 
     Route::middleware('throttle:auth')->group(function () {
         Route::post('/auth/register', [AuthController::class, 'register']);
@@ -57,6 +58,7 @@ Route::prefix('v1')->group(function () {
     });
 
     Route::middleware('auth:sanctum')->group(function () {
+        Route::get('marketplace/buyer/deliveries', [PigMarketplaceController::class, 'buyerDeliveries']);
         Route::post('/auth/push-token', [PushDeviceController::class, 'store']);
         Route::delete('/auth/push-token', [PushDeviceController::class, 'destroy']);
         Route::post('/auth/logout', [AuthController::class, 'logout']);

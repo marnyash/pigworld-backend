@@ -116,6 +116,76 @@ class PigMarketplaceApiTest extends TestCase
         ])->assertMethodNotAllowed();
     }
 
+    public function test_buyer_can_register_send_purchase_request_and_view_delivery_status(): void
+    {
+        [$owner, $farm] = $this->farmWithOwner();
+        $listing = $farm->pigListings()->create([
+            'title' => 'Delivery pig',
+            'breed' => 'Large White',
+            'quantity' => 3,
+            'price_per_pig' => 21000,
+            'currency' => 'KES',
+            'created_by' => $owner->id,
+        ]);
+
+        $buyerId = $this->postJson('/api/v1/auth/register', [
+            'name' => 'Buyer One',
+            'email' => 'buyer@example.com',
+            'phone' => '+254711000123',
+            'password' => 'BuyerPass123',
+            'password_confirmation' => 'BuyerPass123',
+            'role' => 'buyer',
+        ])
+            ->assertOk()
+            ->assertJsonPath('user.role', 'buyer')
+            ->assertJsonPath('farms', [])
+            ->json('user.id');
+
+        $buyer = User::findOrFail($buyerId);
+        $this->postJson("/api/v1/marketplace/pigs/{$listing->id}/buyer-inquiries", [
+            'buyer_name' => $buyer->name,
+            'phone' => $buyer->phone,
+            'quantity' => 1,
+        ])->assertUnauthorized();
+
+        $this->actingAs($owner, 'sanctum')
+            ->postJson("/api/v1/marketplace/pigs/{$listing->id}/buyer-inquiries", [
+                'buyer_name' => 'Farm owner',
+                'phone' => '+254700000000',
+                'quantity' => 1,
+            ])
+            ->assertForbidden();
+
+        $inquiryId = $this->actingAs($buyer, 'sanctum')
+            ->postJson("/api/v1/marketplace/pigs/{$listing->id}/buyer-inquiries", [
+                'buyer_name' => $buyer->name,
+                'phone' => $buyer->phone,
+                'email' => $buyer->email,
+                'quantity' => 2,
+                'message' => 'Please arrange delivery.',
+            ])
+            ->assertCreated()
+            ->json('data.id');
+
+        $this->actingAs($owner, 'sanctum')
+            ->patchJson("/api/v1/farms/{$farm->id}/pig-listings/{$listing->id}/inquiries/{$inquiryId}", [
+                'status' => 'accepted',
+            ])
+            ->assertOk();
+
+        $this->actingAs($buyer, 'sanctum')
+            ->getJson('/api/v1/marketplace/buyer/deliveries')
+            ->assertOk()
+            ->assertJsonPath('data.0.id', (string) $inquiryId)
+            ->assertJsonPath('data.0.status', 'accepted')
+            ->assertJsonPath('data.0.listing.farm_name', 'Marketplace farm');
+
+        $this->actingAs(User::factory()->create(['role' => 'buyer']), 'sanctum')
+            ->getJson('/api/v1/marketplace/buyer/deliveries')
+            ->assertOk()
+            ->assertJsonPath('data', []);
+    }
+
     public function test_listing_for_a_herd_animal_exposes_its_saved_photo_to_buyers(): void
     {
         Storage::fake('public');
