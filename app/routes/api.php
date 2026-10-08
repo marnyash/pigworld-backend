@@ -140,6 +140,7 @@ Route::prefix('v1')->group(function () {
         Route::patch('crm/support-conversations/{conversation}/read', [CrmSupportConversationController::class, 'markAsRead']);
         Route::get('crm/dashboard/overview', [CrmDashboardController::class, 'overview']);
         Route::get('crm/directories/overview', [CrmDirectoryController::class, 'overview']);
+        Route::get('crm/buyers', [CrmDirectoryController::class, 'buyers']);
         Route::get('crm/orders', [CustomerOrderController::class, 'index']);
         Route::post('crm/orders', [CustomerOrderController::class, 'store']);
         Route::get('crm/orders/{order}', [CustomerOrderController::class, 'show']);

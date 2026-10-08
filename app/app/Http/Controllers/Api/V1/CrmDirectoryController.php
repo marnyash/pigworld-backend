@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\Buyer;
 use App\Models\Customer;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -10,6 +11,45 @@ use Illuminate\Http\Request;
 
 class CrmDirectoryController extends Controller
 {
+    public function buyers(Request $request): JsonResponse
+    {
+        $this->authorizeCrmAccess($request);
+        $buyers = Buyer::query()
+            ->with('user:id,name,email,phone,crm_closed_at,created_at')
+            ->withCount('inquiries')
+            ->whereHas('user', function ($query) use ($request): void {
+                $query->when($request->filled('search'), function ($query) use ($request): void {
+                    $term = $request->string('search')->toString();
+                    $query->where(function ($query) use ($term): void {
+                        $query->where('name', 'like', "%{$term}%")
+                            ->orWhere('email', 'like', "%{$term}%")
+                            ->orWhere('phone', 'like', "%{$term}%");
+                    });
+                });
+            })
+            ->latest('id')
+            ->paginate(min(max($request->integer('per_page', 25), 10), 100));
+
+        return response()->json([
+            'data' => $buyers->getCollection()->map(fn (Buyer $buyer): array => [
+                'id' => (string) $buyer->id,
+                'user_id' => (string) $buyer->user_id,
+                'name' => $buyer->user?->name,
+                'email' => $buyer->user?->email,
+                'phone' => $buyer->user?->phone,
+                'status' => $buyer->user?->crm_closed_at ? 'suspended' : 'active',
+                'registered_at' => $buyer->user?->created_at?->toISOString(),
+                'inquiries_count' => (int) $buyer->inquiries_count,
+            ])->values(),
+            'meta' => [
+                'current_page' => $buyers->currentPage(),
+                'last_page' => $buyers->lastPage(),
+                'per_page' => $buyers->perPage(),
+                'total' => $buyers->total(),
+            ],
+        ]);
+    }
+
     public function overview(Request $request): JsonResponse
     {
         $this->authorizeCrmAccess($request);

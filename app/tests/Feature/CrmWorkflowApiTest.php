@@ -7,6 +7,7 @@ use App\Models\CrmTask;
 use App\Models\Farm;
 use App\Models\CustomerOrder;
 use App\Models\Animal;
+use App\Models\Buyer;
 use App\Models\Payment;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -198,6 +199,38 @@ class CrmWorkflowApiTest extends TestCase
             ->assertJsonPath('data.relationships.0.owner.name', $owner->name)
             ->assertJsonCount(1, 'data.relationships.0.managers')
             ->assertJsonCount(2, 'data.relationships.0.workers');
+    }
+
+    public function test_crm_staff_can_view_registered_buyer_accounts(): void
+    {
+        $support = User::factory()->create(['role' => 'farmWorker', 'crm_role' => 'customer_support']);
+        $buyer = User::factory()->create([
+            'role' => 'buyer',
+            'name' => 'Registered Buyer',
+            'email' => 'buyer@example.com',
+            'phone' => '254712345678',
+        ]);
+        Buyer::create(['user_id' => $buyer->id]);
+        User::factory()->create(['role' => 'farmWorker', 'name' => 'Not a Buyer']);
+
+        $this->actingAs($support, 'sanctum')
+            ->getJson('/api/v1/crm/buyers?search=buyer')
+            ->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.name', 'Registered Buyer')
+            ->assertJsonPath('data.0.email', 'buyer@example.com')
+            ->assertJsonPath('data.0.phone', '254712345678')
+            ->assertJsonPath('data.0.status', 'active')
+            ->assertJsonPath('data.0.inquiries_count', 0);
+    }
+
+    public function test_non_crm_users_cannot_view_registered_buyer_accounts(): void
+    {
+        $buyer = User::factory()->create(['role' => 'buyer']);
+
+        $this->actingAs($buyer, 'sanctum')
+            ->getJson('/api/v1/crm/buyers')
+            ->assertForbidden();
     }
 
     public function test_farm_owner_directory_reports_payment_status_and_herd_details(): void
