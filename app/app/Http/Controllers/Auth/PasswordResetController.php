@@ -12,10 +12,10 @@ use Illuminate\View\View;
 
 class PasswordResetController
 {
-    public function show(Request $request, string $token): View
+    public function show(Request $request, ?string $token = null): View
     {
         return view('auth.reset-password', [
-            'token' => $token,
+            'token' => $token ?? (string) $request->query('token', ''),
             'email' => (string) $request->query('email', ''),
             'status' => null,
             'success' => false,

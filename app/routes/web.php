@@ -10,6 +10,8 @@ Route::get('/', function () {
     ]);
 });
 
+Route::get('/reset-password', [PasswordResetController::class, 'show'])
+    ->name('password.reset.query');
 Route::get('/reset-password/{token}', [PasswordResetController::class, 'show'])
     ->name('password.reset');
 Route::post('/reset-password', [PasswordResetController::class, 'reset'])
