@@ -136,6 +136,61 @@ class PigMarketplaceApiTest extends TestCase
         ])->assertMethodNotAllowed();
     }
 
+    public function test_crm_market_lists_posted_and_sold_pigs_only_from_accessible_farms(): void
+    {
+        [$owner, $farm] = $this->farmWithOwner();
+        $crmUser = User::factory()->create([
+        'role' => 'farmWorker',
+        'crm_role' => 'customer_support',
+        ]);
+        $farm->users()->attach($crmUser->id);
+        $otherFarm = Farm::create(['name' => 'Private Market Farm']);
+
+        $posted = $farm->pigListings()->create([
+        'title' => 'Posted gilt',
+        'breed' => 'Large White',
+        'quantity' => 2,
+        'price_per_pig' => 18000,
+        'currency' => 'KES',
+        'created_by' => $owner->id,
+        ]);
+        $sold = $farm->pigListings()->create([
+        'title' => 'Sold boar',
+        'breed' => 'Landrace',
+        'quantity' => 1,
+        'price_per_pig' => 25000,
+        'currency' => 'KES',
+        'status' => 'sold',
+        'created_by' => $owner->id,
+        ]);
+        $otherFarm->pigListings()->create([
+        'title' => 'Hidden listing',
+        'breed' => 'Mixed',
+        'quantity' => 1,
+        'price_per_pig' => 9000,
+        'currency' => 'KES',
+        'created_by' => $owner->id,
+        ]);
+
+        $this->actingAs($crmUser, 'sanctum')
+        ->getJson('/api/v1/crm/market/listings?status=available')
+        ->assertOk()
+        ->assertJsonPath('meta.total', 1)
+        ->assertJsonPath('data.0.id', (string) $posted->id)
+        ->assertJsonPath('data.0.farm_name', 'Marketplace farm');
+
+        $this->actingAs($crmUser, 'sanctum')
+        ->getJson('/api/v1/crm/market/listings?status=sold')
+        ->assertOk()
+        ->assertJsonPath('meta.total', 1)
+        ->assertJsonPath('data.0.id', (string) $sold->id)
+        ->assertJsonPath('data.0.status', 'sold');
+
+        $this->actingAs($crmUser, 'sanctum')
+        ->getJson('/api/v1/crm/market/listings?status=unavailable')
+        ->assertUnprocessable();
+    }
+
     public function test_buyer_can_register_send_purchase_request_and_view_delivery_status(): void
     {
         [$owner, $farm] = $this->farmWithOwner();

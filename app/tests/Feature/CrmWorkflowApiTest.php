@@ -8,6 +8,10 @@ use App\Models\Farm;
 use App\Models\CustomerOrder;
 use App\Models\Animal;
 use App\Models\Buyer;
+use App\Models\FeedStock;
+use App\Models\HealthRecord;
+use App\Models\InventoryItem;
+use App\Models\InventoryMovement;
 use App\Models\Payment;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -202,6 +206,112 @@ class CrmWorkflowApiTest extends TestCase
             ->assertJsonPath('data.relationships.0.owner.name', $owner->name)
             ->assertJsonCount(1, 'data.relationships.0.managers')
             ->assertJsonCount(2, 'data.relationships.0.workers');
+    }
+
+    public function test_crm_operations_lists_feed_medicine_and_emergency_records_for_accessible_farms(): void
+    {
+        $support = User::factory()->create(['role' => 'farmWorker', 'crm_role' => 'customer_support']);
+        $owner = User::factory()->create(['role' => 'farmOwner']);
+        $farm = Farm::create(['name' => 'Operations Farm']);
+        $farm->users()->attach([$support->id, $owner->id]);
+        $otherFarm = Farm::create(['name' => 'Other Operations Farm']);
+        $animal = Animal::create([
+            'farm_id' => $farm->id,
+            'created_by' => $owner->id,
+            'tag' => 'PIG-EMERGENCY',
+            'type' => 'sow',
+            'sex' => 'female',
+            'status' => 'active',
+        ]);
+
+        FeedStock::create([
+            'farm_id' => $farm->id,
+            'created_by' => $owner->id,
+            'name' => 'Grower feed',
+            'quantity' => 12,
+            'unit' => 'bags',
+        ]);
+        FeedStock::create([
+            'farm_id' => $otherFarm->id,
+            'created_by' => $owner->id,
+            'name' => 'Unrelated feed',
+            'quantity' => 4,
+            'unit' => 'bags',
+        ]);
+
+        $medicine = InventoryItem::create([
+            'farm_id' => $farm->id,
+            'created_by' => $owner->id,
+            'name' => 'Antibiotic',
+            'category' => 'Medicine',
+            'sku' => 'OPS-MED-1',
+            'quantity' => 8,
+            'unit' => 'bottles',
+            'minimum_level' => 1,
+            'cost_price' => 25,
+        ]);
+        InventoryMovement::create([
+            'inventory_item_id' => $medicine->id,
+            'type' => 'stock_in',
+            'quantity' => 8,
+            'reference' => 'PO-101',
+            'recorded_by' => $owner->id,
+        ]);
+        $feedItem = InventoryItem::create([
+            'farm_id' => $farm->id,
+            'created_by' => $owner->id,
+            'name' => 'Feed additive',
+            'category' => 'Feed',
+            'sku' => 'OPS-FEED-1',
+            'quantity' => 3,
+            'unit' => 'bags',
+            'minimum_level' => 1,
+            'cost_price' => 10,
+        ]);
+        InventoryMovement::create([
+            'inventory_item_id' => $feedItem->id,
+            'type' => 'stock_in',
+            'quantity' => 3,
+            'recorded_by' => $owner->id,
+        ]);
+
+        HealthRecord::create([
+            'farm_id' => $farm->id,
+            'animal_id' => $animal->id,
+            'created_by' => $owner->id,
+            'type' => 'treatment',
+            'status' => 'critical',
+            'diagnosis' => 'Urgent case',
+        ]);
+        HealthRecord::create([
+            'farm_id' => $farm->id,
+            'animal_id' => $animal->id,
+            'created_by' => $owner->id,
+            'type' => 'treatment',
+            'status' => 'healthy',
+            'diagnosis' => 'Routine check',
+        ]);
+
+        $this->actingAs($support, 'sanctum')
+            ->getJson('/api/v1/crm/operations/feed-orders')
+            ->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.farm_name', 'Operations Farm')
+            ->assertJsonPath('data.0.feed', 'Grower feed');
+
+        $this->actingAs($support, 'sanctum')
+            ->getJson('/api/v1/crm/operations/medicine-orders')
+            ->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.medicine', 'Antibiotic')
+            ->assertJsonPath('data.0.reference', 'PO-101');
+
+        $this->actingAs($support, 'sanctum')
+            ->getJson('/api/v1/crm/operations/emergencies')
+            ->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.pig_tag', 'PIG-EMERGENCY')
+            ->assertJsonPath('data.0.diagnosis', 'Urgent case');
     }
 
     public function test_crm_staff_can_view_registered_buyer_accounts(): void

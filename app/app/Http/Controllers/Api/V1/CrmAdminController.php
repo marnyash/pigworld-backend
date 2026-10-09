@@ -23,11 +23,12 @@ class CrmAdminController extends Controller
             ->whereNull('users.crm_closed_at')
             ->orderBy('users.name')])
             ->orderBy('name')
-            ->get(['id', 'name']);
+            ->get(['id', 'name', 'location']);
 
         return response()->json(['data' => $farms->map(fn (Farm $farm): array => [
             'id' => (string) $farm->id,
             'name' => $farm->name,
+            'location' => $farm->location,
             'members' => $farm->users->map(fn ($user): array => [
                 'id' => (string) $user->id,
                 'name' => $user->name,

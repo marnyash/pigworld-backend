@@ -19,5 +19,6 @@ class FeedStock extends Model
     }
 
     public function farm(): BelongsTo { return $this->belongsTo(Farm::class); }
+    public function creator(): BelongsTo { return $this->belongsTo(User::class, 'created_by'); }
     public function usages(): HasMany { return $this->hasMany(FeedUsage::class); }
 }
