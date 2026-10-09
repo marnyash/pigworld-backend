@@ -185,12 +185,15 @@ class CrmWorkflowApiTest extends TestCase
         $manager = User::factory()->create(['role' => 'farmManager']);
         $worker = User::factory()->create(['role' => 'farmWorker']);
         $unassignedWorker = User::factory()->create(['role' => 'farmWorker']);
+        $buyer = User::factory()->create(['role' => 'buyer']);
+        Buyer::create(['user_id' => $buyer->id]);
         $farm = Farm::create(['name' => 'Directory Farm']);
         $farm->users()->attach([$support->id, $owner->id, $manager->id, $worker->id]);
 
         $this->actingAs($support, 'sanctum')
             ->getJson('/api/v1/crm/directories/overview')
             ->assertOk()
+            ->assertJsonPath('data.buyers', 1)
             ->assertJsonFragment(['name' => $owner->name, 'farm_name' => 'Directory Farm', 'role' => 'farmOwner'])
             ->assertJsonFragment(['name' => $manager->name, 'farm_name' => 'Directory Farm', 'role' => 'farmManager'])
             ->assertJsonFragment(['name' => $worker->name, 'farm_name' => 'Directory Farm', 'role' => 'farmWorker'])

@@ -161,6 +161,7 @@ class CrmDirectoryController extends Controller
             'farm_managers' => $members->where('role', 'farmManager')->values(),
             'farm_workers' => $members->where('role', 'farmWorker')->values(),
             'relationships' => $relationships,
+            'buyers' => Buyer::query()->whereHas('user')->count(),
         ]]);
     }
 
