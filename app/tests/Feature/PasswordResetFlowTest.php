@@ -36,7 +36,11 @@ class PasswordResetFlowTest extends TestCase
             $mail = $notification->toMail($user);
             $this->assertSame('emails.auth.password-reset', $mail->view);
             $this->assertStringStartsWith(
-                'https://forgetpassword.pigworldsmart.com/?',
+                'https://forgotpassword.pigworldsmart.com/?',
+                $mail->viewData['resetUrl'],
+            );
+            $this->assertStringNotContainsString(
+                'api.pigworldsmart.com',
                 $mail->viewData['resetUrl'],
             );
             $this->assertStringContainsString($plainToken, $mail->viewData['resetUrl']);

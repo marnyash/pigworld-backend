@@ -10,7 +10,7 @@ return [
     'password_reset' => [
         'frontend_url' => env(
             'PASSWORD_RESET_FRONTEND_URL',
-            'https://api.pigworldsmart.com/reset-password',
+            'https://forgotpassword.pigworldsmart.com/',
         ),
     ],
 
