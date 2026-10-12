@@ -21,6 +21,7 @@ class PregnancyApiTest extends TestCase
             [
                 'sow_id' => $sow->id,
                 'mating_date' => '2026-01-01',
+                'semen_used' => 'Large White / batch LW-24',
                 'status' => 'confirmed',
             ],
         );
@@ -28,6 +29,7 @@ class PregnancyApiTest extends TestCase
         $response->assertCreated()
             ->assertJsonPath('data.sow_id', (string) $sow->id)
             ->assertJsonPath('data.expected_farrowing_date', '2026-04-25')
+            ->assertJsonPath('data.semen_used', 'Large White / batch LW-24')
             ->assertJsonPath('data.status', 'confirmed');
     }
 

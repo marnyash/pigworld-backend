@@ -16,6 +16,7 @@ class Pregnancy extends Model
         'boar_id',
         'created_by',
         'mating_date',
+        'semen_used',
         'confirmation_date',
         'expected_farrowing_date',
         'actual_farrowing_date',

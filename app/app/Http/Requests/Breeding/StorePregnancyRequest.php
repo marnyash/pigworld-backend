@@ -14,6 +14,7 @@ class StorePregnancyRequest extends FormRequest
             'sow_id' => ['required', 'integer', 'exists:animals,id'],
             'boar_id' => ['nullable', 'integer', 'exists:animals,id'],
             'mating_date' => ['required', 'date'],
+            'semen_used' => ['nullable', 'string', 'max:255'],
             'confirmation_date' => ['nullable', 'date', 'after_or_equal:mating_date'],
             'expected_farrowing_date' => ['nullable', 'date', 'after:mating_date'],
             'status' => ['sometimes', 'in:suspected,confirmed,high_risk,farrowed,aborted'],

@@ -24,6 +24,7 @@ class PregnancyResource extends JsonResource
                 'tag' => $this->boar->tag,
             ] : null),
             'mating_date' => $this->mating_date?->toDateString(),
+            'semen_used' => $this->semen_used,
             'confirmation_date' => $this->confirmation_date?->toDateString(),
             'expected_farrowing_date' => $this->expected_farrowing_date?->toDateString(),
             'actual_farrowing_date' => $this->actual_farrowing_date?->toDateString(),

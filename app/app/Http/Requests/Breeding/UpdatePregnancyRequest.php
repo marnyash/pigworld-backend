@@ -13,6 +13,7 @@ class UpdatePregnancyRequest extends FormRequest
         return [
             'boar_id' => ['nullable', 'integer', 'exists:animals,id'],
             'mating_date' => ['sometimes', 'date'],
+            'semen_used' => ['nullable', 'string', 'max:255'],
             'confirmation_date' => ['nullable', 'date'],
             'expected_farrowing_date' => ['sometimes', 'date'],
             'actual_farrowing_date' => ['nullable', 'date'],
