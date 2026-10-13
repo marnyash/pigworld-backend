@@ -39,6 +39,7 @@ class CrmNotificationController extends Controller
             'farm_id' => ['required', 'integer', 'exists:farms,id'],
             'message' => ['required', 'string', 'max:1000'],
             'recipient_id' => ['nullable', 'integer', 'exists:users,id'],
+            'audience_scope' => ['sometimes', 'in:farm,all_registered'],
             'title' => ['sometimes', 'string', 'max:160'],
             'kind' => ['sometimes', 'in:reply,broadcast'],
         ]);
@@ -56,11 +57,16 @@ class CrmNotificationController extends Controller
         }
 
         $kind = $data['kind'] ?? (isset($data['recipient_id']) ? 'reply' : 'broadcast');
+        $audienceScope = $data['audience_scope'] ?? 'farm';
+        if ($audienceScope === 'all_registered') {
+            abort_unless($user->is_global_crm_admin, 403, 'Only the central CRM administrator can message all registered app users.');
+            abort_unless($kind === 'broadcast' && ! isset($data['recipient_id']), 422, 'A global broadcast cannot target an individual recipient.');
+        }
         if ($kind === 'reply' && ! isset($data['recipient_id'])) {
             abort(422, 'A support reply must target one app member.');
         }
 
-        $result = DB::transaction(function () use ($data, $user, $kind): array {
+        $result = DB::transaction(function () use ($data, $user, $kind, $audienceScope): array {
             $messageId = DB::table('crm_notifications')->insertGetId([
                 'farm_id' => $data['farm_id'],
                 'sender_id' => $user->id,
@@ -71,19 +77,30 @@ class CrmNotificationController extends Controller
             ]);
             $recipients = isset($data['recipient_id'])
                 ? User::query()->whereKey($data['recipient_id'])->get()
-                : User::query()
+                : ($audienceScope === 'all_registered'
+                    ? User::query()
+                    ->whereKeyNot($user->id)
+                    ->whereNull('crm_closed_at')
+                    ->where(function ($query) {
+                        $query->where('role', 'farmOwner')
+                            ->orWhere(fn ($appUsers) => $appUsers->whereIn('role', ['farmManager', 'farmWorker'])->whereNull('crm_role'));
+                    })
+                    ->whereHas('farms')
+                    ->with(['farms' => fn ($query) => $query->orderBy('farms.id')])
+                    ->get()
+                    : User::query()
                     ->whereHas('farms', fn ($query) => $query->where('farms.id', $data['farm_id']))
                     ->whereKeyNot($user->id)
                     ->whereNull('crm_closed_at')
                     ->where(fn ($query) => $query->where('role', 'farmOwner')
                         ->orWhere(fn ($query) => $query->whereIn('role', ['farmManager', 'farmWorker'])->whereNull('crm_role')))
-                    ->get();
+                    ->get());
             $title = trim($data['title'] ?? ($kind === 'reply' ? 'Message from '.$user->name : 'Announcement from '.$user->name));
             $broadcastId = DB::table('communication_broadcasts')->insertGetId([
                 'farm_id' => $data['farm_id'],
                 'sender_id' => $user->id,
                 'recipient_id' => $data['recipient_id'] ?? null,
-                'audience' => isset($data['recipient_id']) ? 'individual' : 'farm',
+                'audience' => isset($data['recipient_id']) ? 'individual' : ($audienceScope === 'all_registered' ? 'all_registered' : 'farm'),
                 'title' => $title,
                 'message' => trim($data['message']),
                 'created_at' => now(),
@@ -91,14 +108,19 @@ class CrmNotificationController extends Controller
             ]);
 
             foreach ($recipients as $recipient) {
+                $recipientFarmId = $audienceScope === 'all_registered'
+                    ? $recipient->farms->first()->id
+                    : $data['farm_id'];
                 $notification = FarmNotification::create([
-                    'farm_id' => $data['farm_id'],
+                    'farm_id' => $recipientFarmId,
                     'recipient_id' => $recipient->id,
                     'type' => $kind === 'reply' ? 'crm_message' : 'crm_broadcast',
                     'title' => $title,
                     'body' => trim($data['message']),
                     'severity' => 'info',
-                    'related_type' => $kind === 'reply' ? 'support_conversation' : 'communication_broadcast',
+                    'related_type' => $audienceScope === 'all_registered'
+                        ? 'global_crm_broadcast'
+                        : ($kind === 'reply' ? 'support_conversation' : 'communication_broadcast'),
                     'related_id' => $broadcastId,
                     'action_route' => $kind === 'reply' ? '/support' : '/notifications',
                 ]);
@@ -138,7 +160,10 @@ class CrmNotificationController extends Controller
         return response()->json([
             'data' => [
                 ...(array) $result['message'],
-                'audience' => isset($data['recipient_id']) ? 'individual' : 'farm',
+                'audience' => isset($data['recipient_id'])
+                    ? 'individual'
+                    : ($audienceScope === 'all_registered' ? 'all_registered' : 'farm'),
+                'audience_scope' => $audienceScope,
                 'broadcast_id' => $result['broadcast_id'],
                 'recipient_count' => $result['recipient_count'],
             ],

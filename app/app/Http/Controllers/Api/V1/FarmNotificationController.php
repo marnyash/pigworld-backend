@@ -19,7 +19,12 @@ class FarmNotificationController extends Controller
         $this->authorizeMember($request, $farm);
 
         $notifications = FarmNotification::query()
-            ->where('farm_id', $farm->id)
+            ->where(function ($query) use ($farm, $request) {
+                $query->where('farm_id', $farm->id)
+                    ->orWhere(fn ($global) => $global
+                        ->where('related_type', 'global_crm_broadcast')
+                        ->where('recipient_id', $request->user()->id));
+            })
             ->where(function ($query) use ($request) {
                 $query->whereNull('recipient_id')->orWhere('recipient_id', $request->user()->id);
             })
@@ -109,7 +114,9 @@ class FarmNotificationController extends Controller
 
     private function authorizeNotification(Request $request, Farm $farm, FarmNotification $notification): void
     {
-        $isAccessible = $notification->farm_id === $farm->id
+        $isAccessible = ($notification->farm_id === $farm->id
+                || ($notification->related_type === 'global_crm_broadcast'
+                    && $notification->recipient_id === $request->user()->id))
             && ($notification->recipient_id === null || $notification->recipient_id === $request->user()->id);
 
         if (! $isAccessible) {

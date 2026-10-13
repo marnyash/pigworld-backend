@@ -140,6 +140,93 @@ class CrmMessagingApiTest extends TestCase
         ]);
     }
 
+    public function test_global_admin_can_broadcast_to_registered_app_users_across_all_farms(): void
+    {
+        $admin = User::factory()->create(['role' => 'farmOwner', 'crm_role' => 'admin']);
+        $admin->forceFill(['is_global_crm_admin' => true])->save();
+        $owner = User::factory()->create(['role' => 'farmOwner']);
+        $manager = User::factory()->create(['role' => 'farmManager']);
+        $worker = User::factory()->create(['role' => 'farmWorker']);
+        $crmStaff = User::factory()->create(['role' => 'farmWorker', 'crm_role' => 'customer_support']);
+        $closedWorker = User::factory()->create(['role' => 'farmWorker', 'crm_closed_at' => now()]);
+        $unaffiliatedWorker = User::factory()->create(['role' => 'farmWorker']);
+        $farmOne = Farm::create(['name' => 'Global Broadcast Farm One']);
+        $farmTwo = Farm::create(['name' => 'Global Broadcast Farm Two']);
+        $farmOne->users()->attach([$owner->id, $worker->id, $crmStaff->id]);
+        $farmTwo->users()->attach([$manager->id, $worker->id, $closedWorker->id]);
+
+        $this->actingAs($admin, 'sanctum')
+            ->postJson('/api/v1/crm/notifications', [
+                'farm_id' => $farmOne->id,
+                'kind' => 'broadcast',
+                'audience_scope' => 'all_registered',
+                'title' => 'Service announcement',
+                'message' => 'A message for all registered app users.',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.audience', 'all_registered')
+            ->assertJsonPath('data.recipient_count', 3);
+
+        foreach ([$owner, $manager, $worker] as $recipient) {
+            $this->assertDatabaseHas('farm_notifications', [
+                'recipient_id' => $recipient->id,
+                'type' => 'crm_broadcast',
+                'title' => 'Service announcement',
+                'related_type' => 'global_crm_broadcast',
+            ]);
+        }
+
+        $this->assertSame(3, DB::table('farm_notifications')
+            ->where('related_type', 'global_crm_broadcast')
+            ->where('title', 'Service announcement')
+            ->distinct('recipient_id')
+            ->count('recipient_id'));
+        $this->assertDatabaseMissing('farm_notifications', [
+            'recipient_id' => $crmStaff->id,
+            'title' => 'Service announcement',
+        ]);
+        $this->assertDatabaseMissing('farm_notifications', [
+            'recipient_id' => $closedWorker->id,
+            'title' => 'Service announcement',
+        ]);
+        $this->assertDatabaseMissing('farm_notifications', [
+            'recipient_id' => $unaffiliatedWorker->id,
+            'title' => 'Service announcement',
+        ]);
+        $this->assertDatabaseHas('communication_broadcasts', [
+            'farm_id' => $farmOne->id,
+            'audience' => 'all_registered',
+            'title' => 'Service announcement',
+        ]);
+
+        $this->actingAs($manager, 'sanctum')
+            ->getJson("/api/v1/farms/{$farmTwo->id}/notifications")
+            ->assertOk()
+            ->assertJsonFragment([
+                'title' => 'Service announcement',
+                'body' => 'A message for all registered app users.',
+            ]);
+    }
+
+    public function test_farm_crm_staff_cannot_broadcast_to_all_registered_users(): void
+    {
+        $support = User::factory()->create(['role' => 'farmWorker', 'crm_role' => 'customer_support']);
+        $member = User::factory()->create(['role' => 'farmWorker']);
+        $farm = Farm::create(['name' => 'Scoped Broadcast Farm']);
+        $farm->users()->attach([$support->id, $member->id]);
+
+        $this->actingAs($support, 'sanctum')
+            ->postJson('/api/v1/crm/notifications', [
+                'farm_id' => $farm->id,
+                'kind' => 'broadcast',
+                'audience_scope' => 'all_registered',
+                'message' => 'This must remain farm-scoped.',
+            ])
+            ->assertForbidden();
+
+        $this->assertSame(0, DB::table('communication_broadcasts')->count());
+    }
+
     public function test_support_thread_tracks_agent_identity_read_state_and_assignment(): void
     {
         $owner = User::factory()->create(['role' => 'farmOwner']);
