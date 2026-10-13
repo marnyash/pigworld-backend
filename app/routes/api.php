@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\V1\CrmPolicyController;
 use App\Http\Controllers\Api\V1\CrmReportController;
 use App\Http\Controllers\Api\V1\CrmStaffCategoryController;
 use App\Http\Controllers\Api\V1\CrmSupportConversationController;
+use App\Http\Controllers\Api\V1\CrmSupportPresenceController;
 use App\Http\Controllers\Api\V1\CrmTaskController;
 use App\Http\Controllers\Api\V1\CustomerController;
 use App\Http\Controllers\Api\V1\CustomerInteractionController;
@@ -64,6 +65,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/auth/push-token', [PushDeviceController::class, 'store']);
         Route::delete('/auth/push-token', [PushDeviceController::class, 'destroy']);
         Route::post('/auth/logout', [AuthController::class, 'logout']);
+        Route::post('/auth/logout-all', [AuthController::class, 'logoutAll']);
         Route::get('/auth/me', [AuthController::class, 'me']);
         Route::patch('/auth/profile', [AuthController::class, 'updateProfile']);
         Route::post('/auth/profile/avatar', [AuthController::class, 'updateProfileAvatar']);
@@ -82,6 +84,7 @@ Route::prefix('v1')->group(function () {
         Route::post('farms/{farm}/notifications/messages', [FarmNotificationController::class, 'sendMessage']);
         Route::patch('farms/{farm}/notifications/{notification}/read', [FarmNotificationController::class, 'markAsRead']);
         Route::get('farms/{farm}/support-conversation', [FarmSupportConversationController::class, 'show']);
+        Route::get('farms/{farm}/support-presence', [FarmSupportConversationController::class, 'presence']);
         Route::post('farms/{farm}/support-conversation/messages', [FarmSupportConversationController::class, 'storeMessage']);
         Route::patch('farms/{farm}/support-conversation/read', [FarmSupportConversationController::class, 'markAsRead']);
         Route::get('farms/{farm}/tasks', [FarmTaskController::class, 'index']);
@@ -136,6 +139,8 @@ Route::prefix('v1')->group(function () {
         Route::patch('crm/admin/notification-templates/{template}', [CrmAdminController::class, 'updateTemplate']);
         Route::delete('crm/admin/notification-templates/{template}', [CrmAdminController::class, 'deleteTemplate']);
         Route::get('crm/support-conversations', [CrmSupportConversationController::class, 'index']);
+        Route::get('crm/support-presence', [CrmSupportPresenceController::class, 'show']);
+        Route::post('crm/support-presence', [CrmSupportPresenceController::class, 'update']);
         Route::get('crm/support-conversations/{conversation}', [CrmSupportConversationController::class, 'show']);
         Route::post('crm/support-conversations/{conversation}/messages', [CrmSupportConversationController::class, 'storeMessage']);
         Route::patch('crm/support-conversations/{conversation}', [CrmSupportConversationController::class, 'update']);

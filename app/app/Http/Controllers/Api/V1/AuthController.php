@@ -299,6 +299,15 @@ class AuthController extends Controller
         return response()->json(null, 204);
     }
 
+    public function logoutAll(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $user->tokens()->delete();
+        $user->refreshTokens()->whereNull('revoked_at')->update(['revoked_at' => now()]);
+
+        return response()->json(['message' => 'All sessions have been revoked.']);
+    }
+
     public function me(Request $request): JsonResponse
     {
         $user = $request->user();

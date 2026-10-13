@@ -7,6 +7,7 @@ use App\Models\Customer;
 use App\Models\Farm;
 use App\Models\SupportConversation;
 use App\Models\SupportMessage;
+use App\Services\Crm\SupportConversationAssigner;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -26,7 +27,18 @@ class FarmSupportConversationController extends Controller
         return response()->json(['data' => $conversation ? $this->conversationData($conversation) : null]);
     }
 
-    public function storeMessage(Request $request, Farm $farm): JsonResponse
+    public function presence(Request $request, Farm $farm, SupportConversationAssigner $assigner): JsonResponse
+    {
+        $this->authorizeMember($request, $farm);
+
+        return response()->json([
+            'data' => [
+                'online' => $assigner->availableAgents($farm->id)->isNotEmpty(),
+            ],
+        ]);
+    }
+
+    public function storeMessage(Request $request, Farm $farm, SupportConversationAssigner $assigner): JsonResponse
     {
         $this->authorizeMember($request, $farm);
         $data = $request->validate([
@@ -43,7 +55,7 @@ class FarmSupportConversationController extends Controller
             abort_unless($customerBelongsToFarm, 422, 'The customer must belong to the selected farm.');
         }
 
-        $conversation = DB::transaction(function () use ($farm, $request, $data): SupportConversation {
+        $conversation = DB::transaction(function () use ($farm, $request, $data, $assigner): SupportConversation {
             $conversation = SupportConversation::query()
                 ->where('farm_id', $farm->id)
                 ->where('app_user_id', $request->user()->id)
@@ -66,6 +78,7 @@ class FarmSupportConversationController extends Controller
                 'body' => trim($data['message']),
             ]);
             $conversation->update(['status' => 'open', 'last_message_at' => now()]);
+            $assigner->assignIfAvailable($conversation);
 
             return $conversation;
         });

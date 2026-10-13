@@ -62,7 +62,7 @@ class FirebasePushServiceTest extends TestCase
             'recipient_id' => $user->id,
             'title' => 'Farm alert',
             'body' => 'A new farm notification.',
-            'action_route' => '/notifications',
+            'action_route' => '/support',
         ]);
         $notification->id = 17;
 
@@ -76,6 +76,7 @@ class FirebasePushServiceTest extends TestCase
             && $request->hasHeader('Authorization', 'Bearer test-access-token')
             && $request->data()['message']['token'] === 'device-token'
             && $request->data()['message']['notification']['title'] === 'Farm alert'
-            && $request->data()['message']['data']['notification_id'] === '17');
+            && $request->data()['message']['data']['notification_id'] === '17'
+            && $request->data()['message']['data']['action_route'] === '/support');
     }
 }

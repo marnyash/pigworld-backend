@@ -3,16 +3,19 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\FarmNotification;
 use App\Models\SupportConversation;
 use App\Models\SupportMessage;
 use App\Models\User;
+use App\Services\Crm\SupportConversationAssigner;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class CrmSupportConversationController extends Controller
 {
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, SupportConversationAssigner $assigner): JsonResponse
     {
         $this->authorizeCrm($request->user());
         $data = $request->validate([
@@ -33,6 +36,13 @@ class CrmSupportConversationController extends Controller
             ->withCount(['messages as unread_count' => fn ($query) => $query->where('sender_role', 'app')->whereNull('read_at')])
             ->orderByDesc('last_message_at')
             ->paginate(min(max($request->integer('per_page', 30), 1), 100));
+
+        foreach ($conversations->getCollection() as $conversation) {
+            if ($conversation->status === 'open') {
+                $assigner->assignIfAvailable($conversation);
+                $conversation->load('assignee:id,name,email,crm_role');
+            }
+        }
 
         return response()->json([
             'data' => $conversations->getCollection()->map(fn (SupportConversation $conversation): array => $this->summaryData($conversation)),
@@ -71,9 +81,21 @@ class CrmSupportConversationController extends Controller
                 'body' => trim($data['message']),
             ]);
             $conversation->update(['status' => 'open', 'last_message_at' => now()]);
+            FarmNotification::create([
+                'farm_id' => $conversation->farm_id,
+                'recipient_id' => $conversation->app_user_id,
+                'type' => 'crm_message',
+                'title' => 'Customer Care',
+                'body' => Str::limit(trim($data['message']), 180),
+                'severity' => 'info',
+                'related_type' => 'support_conversation',
+                'related_id' => $conversation->id,
+                'action_route' => '/support',
+            ]);
 
             return $message;
         });
+        app(SupportConversationAssigner::class)->assignIfAvailable($conversation->fresh());
 
         return response()->json(['data' => $this->messageData($message->load('sender:id,name,crm_role,role'))], 201);
     }
@@ -93,7 +115,13 @@ class CrmSupportConversationController extends Controller
                 ->whereHas('farms', fn ($query) => $query->where('farms.id', $conversation->farm_id))
                 ->first();
             $role = $assignee?->crm_role ?? ($assignee?->role === 'farmOwner' ? 'admin' : null);
-            abort_unless($assignee && in_array($role, ['admin', 'customer_support'], true), 422, 'Assignee must be an active admin or customer support user in this farm.');
+            abort_unless(
+                $assignee
+                    && $assignee->crm_online_until?->isFuture()
+                    && in_array($role, ['admin', 'customer_support'], true),
+                422,
+                'Assignee must be an online admin or customer support user in this farm.',
+            );
         }
 
         $conversation->update($data);

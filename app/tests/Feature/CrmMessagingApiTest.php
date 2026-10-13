@@ -160,6 +160,10 @@ class CrmMessagingApiTest extends TestCase
             ->where('farm_id', $farm->id)
             ->where('app_user_id', $member->id)
             ->value('id');
+        $this->assertDatabaseHas('support_conversations', [
+            'id' => $conversationId,
+            'assigned_user_id' => null,
+        ]);
 
         $this->actingAs($support, 'sanctum')
             ->getJson("/api/v1/crm/support-conversations?farm_id={$farm->id}")
@@ -170,6 +174,22 @@ class CrmMessagingApiTest extends TestCase
         $this->actingAs($support, 'sanctum')
             ->patchJson("/api/v1/crm/support-conversations/{$conversationId}/read")
             ->assertOk();
+
+        $this->actingAs($support, 'sanctum')
+            ->postJson('/api/v1/crm/support-presence', [
+                'farm_id' => $farm->id,
+                'online' => true,
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.online', true);
+
+        $this->actingAs($support, 'sanctum')
+            ->getJson("/api/v1/crm/support-conversations?farm_id={$farm->id}")
+            ->assertOk();
+        $this->assertDatabaseHas('support_conversations', [
+            'id' => $conversationId,
+            'assigned_user_id' => $support->id,
+        ]);
 
         $this->actingAs($support, 'sanctum')
             ->patchJson("/api/v1/crm/support-conversations/{$conversationId}", [
@@ -184,6 +204,16 @@ class CrmMessagingApiTest extends TestCase
             ])
             ->assertCreated()
             ->assertJsonPath('data.sender_name', $support->name);
+        $this->assertDatabaseHas('farm_notifications', [
+            'farm_id' => $farm->id,
+            'recipient_id' => $member->id,
+            'type' => 'crm_message',
+            'title' => 'Customer Care',
+            'body' => 'I am Alex from customer support. I will help you.',
+            'related_type' => 'support_conversation',
+            'related_id' => $conversationId,
+            'action_route' => '/support',
+        ]);
 
         $this->actingAs($member, 'sanctum')
             ->getJson("/api/v1/farms/{$farm->id}/support-conversation")
@@ -199,6 +229,67 @@ class CrmMessagingApiTest extends TestCase
             ->getJson("/api/v1/crm/support-conversations/{$conversationId}")
             ->assertOk()
             ->assertJsonPath('data.unread_count', 0);
+    }
+
+    public function test_support_messages_are_assigned_to_an_online_agent_without_open_tasks(): void
+    {
+        $owner = User::factory()->create(['role' => 'farmOwner']);
+        $busyAgent = User::factory()->create(['role' => 'farmWorker', 'crm_role' => 'customer_support']);
+        $availableAgent = User::factory()->create(['role' => 'farmWorker', 'crm_role' => 'admin']);
+        $member = User::factory()->create(['role' => 'farmWorker']);
+        $farm = Farm::create(['name' => 'Task-aware Support Farm']);
+        $farm->users()->attach([$owner->id, $busyAgent->id, $availableAgent->id, $member->id]);
+        $customer = Customer::create([
+            'farm_id' => $farm->id,
+            'created_by' => $owner->id,
+            'assigned_user_id' => $busyAgent->id,
+            'name' => 'Busy Agent Customer',
+            'email' => 'busy@example.com',
+            'phone' => '254700123456',
+            'company' => 'Busy Customer Ltd',
+            'address' => 'Nairobi',
+            'type' => 'buyer',
+            'status' => 'new',
+            'notes' => '',
+        ]);
+        DB::table('crm_tasks')->insert([
+            'farm_id' => $farm->id,
+            'customer_id' => $customer->id,
+            'assigned_to' => $busyAgent->id,
+            'created_by' => $owner->id,
+            'title' => 'Follow up on customer',
+            'status' => 'open',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        foreach ([$busyAgent, $availableAgent] as $agent) {
+            $this->actingAs($agent, 'sanctum')
+                ->postJson('/api/v1/crm/support-presence', [
+                    'farm_id' => $farm->id,
+                    'online' => true,
+                ])
+                ->assertOk();
+        }
+
+        $this->actingAs($availableAgent, 'sanctum')
+            ->getJson("/api/v1/crm/support-presence?farm_id={$farm->id}")
+            ->assertOk()
+            ->assertJsonPath('data.online_agents.0.id', (string) $availableAgent->id)
+            ->assertJsonPath('data.online_agents.0.open_crm_tasks', 0)
+            ->assertJsonPath('data.online_agents.1.open_crm_tasks', 1);
+
+        $this->actingAs($member, 'sanctum')
+            ->postJson("/api/v1/farms/{$farm->id}/support-conversation/messages", [
+                'message' => 'Please contact me about my order.',
+            ])
+            ->assertCreated();
+
+        $this->assertDatabaseHas('support_conversations', [
+            'farm_id' => $farm->id,
+            'app_user_id' => $member->id,
+            'assigned_user_id' => $availableAgent->id,
+        ]);
     }
 
     public function test_customer_specific_support_threads_are_linked_to_the_correct_customer(): void

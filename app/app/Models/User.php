@@ -78,6 +78,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'crm_closed_at' => 'datetime',
+            'crm_online_until' => 'datetime',
         ];
     }
 }
