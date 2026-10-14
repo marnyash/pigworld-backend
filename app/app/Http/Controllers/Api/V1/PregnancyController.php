@@ -12,6 +12,7 @@ use App\Models\Pregnancy;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class PregnancyController extends Controller
 {
@@ -91,6 +92,11 @@ class PregnancyController extends Controller
     {
         $animal = $farm->animals()->whereKey($animalId)->first();
         abort_if($animal === null, 422, "The {$role} does not belong to this farm.");
+        if ($role === 'sow' && $animal->sex !== 'female') {
+            throw ValidationException::withMessages([
+                'sow_id' => ['Select a female pig.'],
+            ]);
+        }
     }
 
     private function assertPregnancyBelongsToFarm(Farm $farm, Pregnancy $pregnancy): void

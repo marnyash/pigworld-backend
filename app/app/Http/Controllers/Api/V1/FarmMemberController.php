@@ -35,6 +35,20 @@ class FarmMemberController extends Controller
         return response()->json(['data' => new FarmMemberResource($farm->users()->findOrFail($user->id))]);
     }
 
+    public function destroy(Request $request, Farm $farm, User $user): JsonResponse
+    {
+        $this->authorizeOwner($request, $farm);
+        $isFarmMember = $farm->users()->where('users.id', $user->id)->exists();
+
+        if (! $isFarmMember || $user->role === 'farmOwner') {
+            abort(404, 'Farm member not found.');
+        }
+
+        $farm->users()->detach($user->id);
+
+        return response()->json(['message' => 'Farm member removed.']);
+    }
+
     private function authorizeMember(Request $request, Farm $farm): void
     {
         $belongs = $request->user()->farms()->where('farms.id', $farm->id)->exists();

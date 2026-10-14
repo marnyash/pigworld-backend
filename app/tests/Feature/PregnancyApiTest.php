@@ -59,6 +59,26 @@ class PregnancyApiTest extends TestCase
             ->assertJsonPath('data.born_alive', 10);
     }
 
+    public function test_owner_cannot_record_a_male_pig_as_the_sow(): void
+    {
+        [$user, $farm] = $this->farmWithSow();
+        $male = Animal::create([
+            'farm_id' => $farm->id,
+            'tag' => 'BOAR-1',
+            'type' => 'boar',
+            'sex' => 'male',
+        ]);
+
+        $this->actingAs($user)->postJson(
+            "/api/v1/farms/{$farm->id}/pregnancies",
+            [
+                'sow_id' => $male->id,
+                'mating_date' => '2026-01-01',
+            ],
+        )->assertUnprocessable()
+            ->assertJsonValidationErrors(['sow_id']);
+    }
+
     public function test_user_cannot_access_another_farms_pregnancy(): void
     {
         [$user, $farm, $sow] = $this->farmWithSow();
