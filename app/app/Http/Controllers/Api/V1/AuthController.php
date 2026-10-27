@@ -82,6 +82,7 @@ class AuthController extends Controller
                 ? Farm::create([
                     'name' => $data['farm_name'],
                     'mother_pig_count' => $data['mother_pig_count'] ?? 0,
+                    'piglet_groups' => $data['piglet_groups'] ?? [],
                     'pregnant_pig_count' => $data['pregnant_pig_count'] ?? 0,
                 ])
                 : (isset($data['invite_code'])
