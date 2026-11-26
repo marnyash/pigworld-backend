@@ -52,7 +52,7 @@
     @if ($success)
         <p class="success" role="status">{{ $status }}</p>
         <p>Your new password is ready to use in the Pig World Smart app.</p>
-        <a class="submit" href="pigworldsmart://open/login">Back to app</a>
+        <a class="submit" href="pigworldsmart://open/">Back to app</a>
         <p class="footer"><a href="https://pigworldsmart.com">Visit Pig World Smart website</a></p>
     @else
         <p class="intro">Create a new password for your account. For your security, this reset link expires after 60 minutes.</p>

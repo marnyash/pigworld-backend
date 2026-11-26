@@ -70,7 +70,7 @@ class PasswordResetFlowTest extends TestCase
             'password_confirmation' => 'new-password-123',
         ])->assertOk()
             ->assertSee('Password updated')
-            ->assertSee('href="pigworldsmart://open/login"', false)
+            ->assertSee('href="pigworldsmart://open/"', false)
             ->assertSee('Back to app');
 
         $this->assertTrue(Hash::check('new-password-123', $user->fresh()->password));
