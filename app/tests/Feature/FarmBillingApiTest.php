@@ -92,4 +92,37 @@ class FarmBillingApiTest extends TestCase
 
         $this->assertDatabaseHas('farms', ['id' => $farm->id, 'subscription_plan' => $plan->code]);
     }
+
+    public function test_farm_owner_can_add_the_required_herd_count_before_payment(): void
+    {
+        $owner = User::factory()->create(['role' => 'farmOwner']);
+        $farm = Farm::create(['name' => 'Herd Setup Farm', 'mother_pig_count' => 0]);
+        $owner->farms()->attach($farm);
+        Sanctum::actingAs($owner);
+
+        $this->patchJson("/api/v1/farms/{$farm->id}", ['mother_pig_count' => 8])
+            ->assertOk()
+            ->assertJsonPath('data.mother_pig_count', 8);
+
+        $this->assertDatabaseHas('farms', [
+            'id' => $farm->id,
+            'mother_pig_count' => 8,
+        ]);
+    }
+
+    public function test_farm_owner_cannot_save_an_empty_herd_count(): void
+    {
+        $owner = User::factory()->create(['role' => 'farmOwner']);
+        $farm = Farm::create(['name' => 'Herd Setup Farm', 'mother_pig_count' => 0]);
+        $owner->farms()->attach($farm);
+        Sanctum::actingAs($owner);
+
+        $this->patchJson("/api/v1/farms/{$farm->id}", ['mother_pig_count' => 0])
+            ->assertUnprocessable();
+
+        $this->assertDatabaseHas('farms', [
+            'id' => $farm->id,
+            'mother_pig_count' => 0,
+        ]);
+    }
 }

@@ -30,6 +30,7 @@ class FarmController extends Controller
         );
 
         $farm->update($request->validate([
+            'mother_pig_count' => ['sometimes', 'required', 'integer', 'min:1'],
             'location' => ['sometimes', 'nullable', 'string', 'max:255'],
             'latitude' => ['sometimes', 'nullable', 'numeric', 'between:-90,90', 'required_with:longitude'],
             'longitude' => ['sometimes', 'nullable', 'numeric', 'between:-180,180', 'required_with:latitude'],
