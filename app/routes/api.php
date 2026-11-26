@@ -166,6 +166,7 @@ Route::prefix('v1')->group(function () {
 
         Route::get('farms/{farm}/members', [FarmMemberController::class, 'index']);
         Route::patch('farms/{farm}/members/{user}', [FarmMemberController::class, 'update']);
+        Route::delete('farms/{farm}/members/{user}', [FarmMemberController::class, 'destroy']);
         Route::get('farms/{farm}/join-requests', [FarmJoinRequestController::class, 'index']);
         Route::patch('farms/{farm}/join-requests/{farmJoinRequest}', [FarmJoinRequestController::class, 'review']);
         Route::patch('farms/{farm}/subscription', [FarmSubscriptionController::class, 'update']);

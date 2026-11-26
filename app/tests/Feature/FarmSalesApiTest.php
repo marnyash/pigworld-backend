@@ -51,11 +51,13 @@ class FarmSalesApiTest extends TestCase
             'total_amount' => 30000,
         ]);
 
-        $this->actingAs($manager, 'sanctum')
-            ->patchJson("/api/v1/farms/{$farm->id}/sales/{$saleId}", ['status' => 'completed'])
-            ->assertOk()
-            ->assertJsonPath('data.status', 'completed')
-            ->assertJsonPath('data.completed_at', '2026-10-06');
+        $this->travelTo('2026-10-06 12:00:00', function () use ($manager, $farm, $saleId): void {
+            $this->actingAs($manager, 'sanctum')
+                ->patchJson("/api/v1/farms/{$farm->id}/sales/{$saleId}", ['status' => 'completed'])
+                ->assertOk()
+                ->assertJsonPath('data.status', 'completed')
+                ->assertJsonPath('data.completed_at', '2026-10-06');
+        });
 
         $this->actingAs($manager, 'sanctum')
             ->getJson("/api/v1/farms/{$farm->id}/sales")
