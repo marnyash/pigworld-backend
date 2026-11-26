@@ -68,9 +68,21 @@ class PasswordResetFlowTest extends TestCase
             'email' => $user->email,
             'password' => 'new-password-123',
             'password_confirmation' => 'new-password-123',
-        ])->assertOk()->assertSee('Password updated');
+        ])->assertOk()
+            ->assertSee('Password updated')
+            ->assertSee('href="pigworldsmart://open/login"', false)
+            ->assertSee('Back to app');
 
         $this->assertTrue(Hash::check('new-password-123', $user->fresh()->password));
+        $this->postJson('/api/v1/auth/login', [
+            'identifier' => $user->email,
+            'password' => 'new-password-123',
+        ])->assertOk()
+            ->assertJsonPath('otp_required', true);
+        $this->postJson('/api/v1/auth/login', [
+            'identifier' => $user->email,
+            'password' => 'old-password',
+        ])->assertUnprocessable();
         $this->assertDatabaseMissing('personal_access_tokens', ['id' => $accessToken->id]);
         $this->assertNotNull($refreshToken->fresh()->revoked_at);
         $this->assertDatabaseMissing('password_reset_tokens', ['email' => $user->email]);

@@ -29,7 +29,7 @@
         .hint{margin:7px 0 0;color:var(--muted);font-size:12px}
         .error{margin:14px 0;padding:12px 14px;border:1px solid #f0d4d4;border-radius:12px;background:#fff6f6;color:var(--danger);font-size:13px;line-height:1.5}
         .success{margin:20px 0;padding:15px;border:1px solid #cce6d1;border-radius:14px;background:#e8f4e9;color:var(--success);line-height:1.55}
-        .submit{width:100%;min-height:50px;margin-top:23px;padding:13px 16px;border:0;border-radius:12px;background:var(--green);color:#fff;font:inherit;font-weight:800;cursor:pointer;transition:background .15s,transform .15s}
+        .submit{display:block;width:100%;min-height:50px;margin-top:23px;padding:13px 16px;border:0;border-radius:12px;background:var(--green);color:#fff;font:inherit;font-weight:800;text-align:center;text-decoration:none;cursor:pointer;transition:background .15s,transform .15s}
         .submit:hover{background:var(--green-dark)}
         .submit:active{transform:translateY(1px)}
         .footer{margin:20px 0 0;text-align:center;font-size:13px}
@@ -52,7 +52,8 @@
     @if ($success)
         <p class="success" role="status">{{ $status }}</p>
         <p>Your new password is ready to use in the Pig World Smart app.</p>
-        <p class="footer"><a href="https://pigworldsmart.com">Return to Pig World Smart</a></p>
+        <a class="submit" href="pigworldsmart://open/login">Back to app</a>
+        <p class="footer"><a href="https://pigworldsmart.com">Visit Pig World Smart website</a></p>
     @else
         <p class="intro">Create a new password for your account. For your security, this reset link expires after 60 minutes.</p>
         @if ($status)<div class="error" role="alert">{{ $status }}</div>@endif
