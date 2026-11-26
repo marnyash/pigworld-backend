@@ -3,7 +3,6 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
-use App\Notifications\PasswordResetNotification;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -60,11 +59,6 @@ class User extends Authenticatable
             ->flatMap(fn (Farm $farm) => $farm->users)
             ->unique('id')
             ->values();
-    }
-
-    public function sendPasswordResetNotification(#[\SensitiveParameter] $token): void
-    {
-        $this->notify(new PasswordResetNotification($token));
     }
 
     /**

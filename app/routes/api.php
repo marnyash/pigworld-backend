@@ -57,6 +57,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/auth/firebase', [AuthController::class, 'loginWithFirebase']);
         Route::post('/auth/refresh', [AuthController::class, 'refresh']);
         Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword']);
+        Route::post('/auth/verify-password-reset-code', [AuthController::class, 'verifyPasswordResetCode']);
         Route::post('/auth/reset-password', [AuthController::class, 'resetPassword']);
     });
 

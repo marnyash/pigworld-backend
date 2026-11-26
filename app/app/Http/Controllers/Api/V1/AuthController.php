@@ -16,6 +16,7 @@ use App\Models\FarmNotification;
 use App\Models\LoginOtp;
 use App\Models\User;
 use App\Notifications\LoginOtpNotification;
+use App\Notifications\PasswordResetCodeNotification;
 use App\Services\Auth\FirebaseIdTokenVerifier;
 use App\Services\Auth\TokenIssuer;
 use Illuminate\Http\JsonResponse;
@@ -365,16 +366,62 @@ class AuthController extends Controller
 
     public function forgotPassword(ForgotPasswordRequest $request): JsonResponse
     {
-        // Always respond the same way to avoid revealing whether an account exists for this email.
-        $status = Password::sendResetLink($request->only('email'));
+        $user = User::query()->where('email', $request->validated('email'))->first();
+        $message = 'If that email is registered, a password reset code has been sent.';
+        if ($user === null) {
+            return response()->json(['message' => $message]);
+        }
 
-        if (! in_array($status, [Password::RESET_LINK_SENT, Password::INVALID_USER], true)) {
+        $broker = Password::broker();
+        $repository = $broker->getRepository();
+        if ($repository->recentlyCreatedToken($user)) {
+            return response()->json(['message' => $message]);
+        }
+
+        $code = (string) random_int(100000, 999999);
+        DB::table(config('auth.passwords.'.config('auth.defaults.passwords').'.table'))
+            ->updateOrInsert(
+                ['email' => $user->getEmailForPasswordReset()],
+                ['token' => Hash::make($code), 'created_at' => now()],
+            );
+
+        try {
+            Notification::send($user, new PasswordResetCodeNotification($code));
+        } catch (Throwable $exception) {
+            DB::table(config('auth.passwords.'.config('auth.defaults.passwords').'.table'))
+                ->where('email', $user->getEmailForPasswordReset())
+                ->delete();
+            report($exception);
             throw ValidationException::withMessages([
-                'email' => [__($status)],
+                'email' => ['Unable to send a password reset code right now. Please try again.'],
             ]);
         }
 
-        return response()->json(['message' => 'If that email is registered, a reset link has been sent.']);
+        return response()->json(['message' => $message]);
+    }
+
+    public function verifyPasswordResetCode(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'email' => ['required', 'email'],
+            'code' => ['required', 'string', 'regex:/^\d{6}$/'],
+        ]);
+        $rateLimitKey = $this->passwordResetRateLimitKey($request, $data['email']);
+        if (RateLimiter::tooManyAttempts($rateLimitKey, 5)) {
+            throw ValidationException::withMessages([
+                'code' => ['Too many code attempts. Request a new code and try again later.'],
+            ]);
+        }
+
+        $user = User::query()->where('email', $data['email'])->first();
+        if ($user === null || ! Password::broker()->getRepository()->exists($user, $data['code'])) {
+            RateLimiter::hit($rateLimitKey, 600);
+            throw ValidationException::withMessages([
+                'code' => ['The code is invalid or has expired. Request a new code and try again.'],
+            ]);
+        }
+
+        return response()->json(['message' => 'Code verified. You can now reset your password.']);
     }
 
     public function resetPassword(Request $request): JsonResponse
@@ -384,12 +431,19 @@ class AuthController extends Controller
             'email' => ['required', 'email'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
+        $rateLimitKey = $this->passwordResetRateLimitKey($request, $data['email']);
+        if (RateLimiter::tooManyAttempts($rateLimitKey, 5)) {
+            throw ValidationException::withMessages([
+                'code' => ['Too many code attempts. Request a new code and try again later.'],
+            ]);
+        }
 
         $status = Password::reset($data, function (User $user, string $password): void {
             DB::transaction(function () use ($user, $password): void {
                 $user->forceFill([
                     'password' => $password,
                     'remember_token' => Str::random(60),
+                    'email_verified_at' => $user->email_verified_at ?? now(),
                 ])->save();
                 $user->tokens()->delete();
                 $user->refreshTokens()->update(['revoked_at' => now()]);
@@ -397,14 +451,21 @@ class AuthController extends Controller
         });
 
         if ($status !== Password::PASSWORD_RESET) {
+            RateLimiter::hit($rateLimitKey, 600);
             throw ValidationException::withMessages([
-                'email' => [__($status)],
+                'code' => ['The code is invalid or has expired. Request a new code and try again.'],
             ]);
         }
+        RateLimiter::clear($rateLimitKey);
 
         return response()->json([
             'message' => 'Your password has been updated. You can now sign in to Pig World Smart.',
         ]);
+    }
+
+    private function passwordResetRateLimitKey(Request $request, string $email): string
+    {
+        return 'password-reset:'.hash('sha256', strtolower($email)).':'.hash('sha256', (string) $request->ip());
     }
 
     private function maskedEmail(string $email): string
