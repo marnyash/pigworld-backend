@@ -25,8 +25,8 @@
                     </tr>
                     <tr>
                         <td style="padding:0 28px 28px">
-                            <p style="margin:0 0 12px;color:#65766a;font-size:13px;line-height:1.6">This secure link expires in {{ $expiresIn }} minutes and can only be used once.</p>
-                            <p style="margin:0 0 8px;color:#65766a;font-size:13px;line-height:1.6">If the button does not work, copy and paste this address into your browser:</p>
+                            <p style="margin:0 0 12px;color:#65766a;font-size:13px;line-height:1.6">This secure link expires in {{ $expiresIn }} minutes and can only be used once. Open it on a phone with Pig World Smart installed to set your new password in the app.</p>
+                            <p style="margin:0 0 8px;color:#65766a;font-size:13px;line-height:1.6">If the button does not work, open this link on your phone:</p>
                             <p style="margin:0;overflow-wrap:anywhere;color:#176b4d;font-size:12px;line-height:1.6"><a href="{{ $resetUrl }}" style="color:#176b4d">{{ $resetUrl }}</a></p>
                             <hr style="height:1px;margin:22px 0;border:0;background:#e5ece4">
                             <p style="margin:0;color:#8a968d;font-size:12px;line-height:1.6">If you did not request a password reset, you can ignore this email. Your password will not change.</p>

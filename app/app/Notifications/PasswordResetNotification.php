@@ -20,10 +20,10 @@ class PasswordResetNotification extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
-        $resetBaseUrl = rtrim((string) config('services.password_reset.frontend_url'), '/');
+        $resetBaseUrl = rtrim((string) config('services.password_reset.app_url'), '/');
         $resetPath = str_ends_with($resetBaseUrl, '/reset-password')
             ? $resetBaseUrl
-            : $resetBaseUrl.'/';
+            : $resetBaseUrl.'/reset-password';
         $resetUrl = $resetPath.'?'.http_build_query([
                 'token' => $this->token,
                 'email' => $notifiable->getEmailForPasswordReset(),

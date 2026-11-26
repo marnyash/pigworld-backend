@@ -8,10 +8,7 @@ return [
     ],
 
     'password_reset' => [
-        'frontend_url' => env(
-            'PASSWORD_RESET_FRONTEND_URL',
-            'https://forgotpassword.pigworldsmart.com/',
-        ),
+        'app_url' => env('PASSWORD_RESET_APP_URL', 'pigworldsmart://open/reset-password'),
     ],
 
     /*
