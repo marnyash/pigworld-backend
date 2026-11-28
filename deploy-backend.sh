@@ -20,10 +20,14 @@ composer --version | head -n1
 echo "✓ PHP and Composer available"
 echo ""
 
-# Navigate to backend
-echo "[2/10] Navigating to backend directory..."
+# Navigate to backend and synchronize the deployed application checkout.
+echo "[2/11] Navigating and synchronizing backend directory..."
 cd "$BACKEND_DIR"
+REPO_DIR=$(cd "$BACKEND_DIR/.." && pwd)
+git -C "$REPO_DIR" fetch origin main
+git -C "$REPO_DIR" reset --hard origin/main
 echo "✓ Working directory: $(pwd)"
+echo "✓ Repository synchronized at $(git -C "$REPO_DIR" rev-parse --short HEAD)"
 echo ""
 
 # Check if .env exists
